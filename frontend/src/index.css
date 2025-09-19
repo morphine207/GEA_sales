@@ -1,0 +1,98 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+
+@font-face {
+  font-family: 'Satoshi';
+  src: local('Satoshi'), url('./assets/fonts/Satoshi-Variable.ttf');
+  font-feature-settings: 'zero';
+}
+
+:root {
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  --sidebar-width: 16rem;
+  --navigation-height: 56px;
+  --backgorund: #f3f4f6;
+  --backgorund: #f8f8f8;
+  --container-color: #fff;
+  --nav-width: 240px;
+  --nav-bg-dark: #0026B7;
+}
+
+/* Custom utility classes for better zero/O distinction */
+@layer utilities {
+  .font-feature-zero {
+    font-feature-settings: 'zero' on;
+  }
+  
+  .slashed-zero {
+    font-variant-numeric: slashed-zero tabular-nums;
+  }
+}
+
+.nav-sidbar-dark {
+  background-color: var(--nav-bg-dark);
+  width: var(--nav-width)
+}
+
+html {
+  margin: 0;
+  padding: 0;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+}
+
+.sidebar-width {
+  width: var(--sidebar-width);
+}
+
+.sidebar-margin-top{
+  margin-top: var(--navigation-height);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.slidein-text {
+  animation: slideIn 0.5s forwards;
+}
+
+@keyframes revealText {
+  from {
+    height: 0;
+  }
+  to {
+    height: auto;
+    max-height: 10000px;
+  }
+}
+
+.revealed-text {
+  overflow: hidden;
+  animation: revealText 0.5s forwards;
+}
+
+.revealed-text.open {
+  height: auto;
+}
