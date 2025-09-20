@@ -70,6 +70,10 @@ class ProjectRequest(BaseModel):
     width_mm: float
     height_mm: float
     weight_kg: float
+    # New calculation details persisted with project
+    years: Optional[int] = 5
+    energy_price_eur_per_kwh: Optional[float] = 0.25
+    water_price_eur_per_l: Optional[float] = 0.002
 
 class ProjectResponse(BaseModel):
     success: bool
@@ -141,7 +145,10 @@ async def create_or_update_project(project_data: ProjectRequest):
             length_mm=project_data.length_mm,
             width_mm=project_data.width_mm,
             height_mm=project_data.height_mm,
-            weight_kg=project_data.weight_kg
+            weight_kg=project_data.weight_kg,
+            years=project_data.years or 5,
+            energy_price_eur_per_kwh=project_data.energy_price_eur_per_kwh or 0.25,
+            water_price_eur_per_l=project_data.water_price_eur_per_l or 0.002,
         )
         
         # Store/update the project (using project_name as primary key)
@@ -192,11 +199,16 @@ async def calculate_project_tco(
             # Derive training_cost from commissioning percentage of machine list price
             training_cost = (machine.list_price or 0.0) * float(request.commissioning_pct)
 
+            # Fallback to project defaults if not supplied in request
+            calc_years = request.years or project.years
+            calc_electricity = request.electricity_eur_per_kwh or project.energy_price_eur_per_kwh
+            calc_water = request.water_eur_per_l or project.water_price_eur_per_l
+
             tco = calculate_tco_for_machine(
                 machine,
-                years=request.years,
-                electricity_eur_per_kwh=request.electricity_eur_per_kwh,
-                water_eur_per_l=request.water_eur_per_l,
+                years=calc_years,
+                electricity_eur_per_kwh=calc_electricity,
+                water_eur_per_l=calc_water,
                 training_cost=training_cost,
                 label=request.label,
                 operation_hours_per_year=request.operation_hours_per_year,

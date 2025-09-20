@@ -42,6 +42,9 @@ def create_demo_projects() -> List[Project]:
         width_mm=1800.0,
         height_mm=2200.0,
         weight_kg=850.0,
+        years=20,
+        energy_price_eur_per_kwh=0.25,
+        water_price_eur_per_l=0.002,
     )
 
     # Matches Beer machines (e.g., GFA 200-98-270 / GFA 200-18-944)
@@ -62,6 +65,9 @@ def create_demo_projects() -> List[Project]:
         width_mm=2000.0,
         height_mm=2400.0,
         weight_kg=1200.0,
+        years=5,
+        energy_price_eur_per_kwh=0.25,
+        water_price_eur_per_l=0.002,
     )
 
     # Matches Tea machines (e.g., GFA 10-50-645)
@@ -82,6 +88,9 @@ def create_demo_projects() -> List[Project]:
         width_mm=1200.0,
         height_mm=2000.0,
         weight_kg=650.0,
+        years=5,
+        energy_price_eur_per_kwh=0.25,
+        water_price_eur_per_l=0.002,
     )
 
     return [demo_project_1, demo_project_2, demo_project_3]

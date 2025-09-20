@@ -42,11 +42,11 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
       setCalcError("");
       await onUpdate(formData); // ensure project is saved before calculation
       const resp = await apiCalculateProjectTCO(formData.projectName, {
-        years: 5,
-        electricity_eur_per_kwh: 0.25,
-        water_eur_per_l: 0.002,
+        years: formData.years,
+        electricity_eur_per_kwh: formData.energyPriceEurPerKwh,
+        water_eur_per_l: formData.waterPriceEurPerL,
         operation_hours_per_day: 16,
-        workdays_per_week: 5,
+        workdays_per_week: formData.workdaysPerWeek,
       });
 
       // Map backend minimal TCO results for rendering (label, Ca, Cc, Co, Cm, Total)
@@ -95,154 +95,210 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column */}
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Company details */}
           <div>
-            <Label htmlFor="company" className="text-sm font-medium text-muted-foreground">COMPANY</Label>
-            <Input
-              id="company"
-              value={formData.company}
-              onChange={(e) => handleFieldChange('company', e.target.value)}
-              className="mt-1"
-            />
+            <h4 className="text-sm font-semibold text-foreground mb-3">Company details</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="company" className="text-sm font-medium text-muted-foreground">COMPANY</Label>
+                <Input
+                  id="company"
+                  value={formData.company}
+                  onChange={(e) => handleFieldChange('company', e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="contact" className="text-sm font-medium text-muted-foreground">CONTACT</Label>
+                <Input
+                  id="contact"
+                  value={formData.contact}
+                  onChange={(e) => handleFieldChange('contact', e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="telephone" className="text-sm font-medium text-muted-foreground">TELEPHONE</Label>
+                <Input
+                  id="telephone"
+                  value={formData.telephone}
+                  onChange={(e) => handleFieldChange('telephone', e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="mail" className="text-sm font-medium text-muted-foreground">MAIL</Label>
+                <Input
+                  id="mail"
+                  type="email"
+                  value={formData.mail}
+                  onChange={(e) => handleFieldChange('mail', e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+            </div>
           </div>
 
+          {/* Application */}
           <div>
-            <Label htmlFor="telephone" className="text-sm font-medium text-muted-foreground">TELEPHONE</Label>
-            <Input
-              id="telephone"
-              value={formData.telephone}
-              onChange={(e) => handleFieldChange('telephone', e.target.value)}
-              className="mt-1"
-            />
+            <h4 className="text-sm font-semibold text-foreground mb-3">Application</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="application" className="text-sm font-medium text-muted-foreground">APPLICATION</Label>
+                <Input
+                  id="application"
+                  value={formData.application}
+                  onChange={(e) => handleFieldChange('application', e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="subApplication" className="text-sm font-medium text-muted-foreground">SUB APPLICATION</Label>
+                <Input
+                  id="subApplication"
+                  value={formData.subApplication}
+                  onChange={(e) => handleFieldChange('subApplication', e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="feedSolid" className="text-sm font-medium text-muted-foreground">FEED SOLID (%)</Label>
+                <Input
+                  id="feedSolid"
+                  value={formData.feedSolid}
+                  onChange={(e) => handleFieldChange('feedSolid', e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="capacityPerDay" className="text-sm font-medium text-muted-foreground">CAPACITY / DAY</Label>
+                <Input
+                  id="capacityPerDay"
+                  type="number"
+                  value={formData.capacityPerDay}
+                  onChange={(e) => handleFieldChange('capacityPerDay', Number(e.target.value))}
+                  className="mt-1"
+                />
+              </div>
+            </div>
           </div>
 
+          {/* Calculation details */}
           <div>
-            <Label htmlFor="application" className="text-sm font-medium text-muted-foreground">APPLICATION</Label>
-            <Input
-              id="application"
-              value={formData.application}
-              onChange={(e) => handleFieldChange('application', e.target.value)}
-              className="mt-1"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="feedSolid" className="text-sm font-medium text-muted-foreground">FEED SOLID</Label>
-            <Input
-              id="feedSolid"
-              value={formData.feedSolid}
-              onChange={(e) => handleFieldChange('feedSolid', e.target.value)}
-              className="mt-1"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="protectionClass" className="text-sm font-medium text-muted-foreground">PROTECTION CLASS</Label>
-            <Input
-              id="protectionClass"
-              value={formData.protectionClass}
-              onChange={(e) => handleFieldChange('protectionClass', e.target.value)}
-              className="mt-1"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="maxWidth" className="text-sm font-medium text-muted-foreground">MAX WIDTH</Label>
-            <Input
-              id="maxWidth"
-              type="number"
-              value={formData.maxWidth}
-              onChange={(e) => handleFieldChange('maxWidth', Number(e.target.value))}
-              className="mt-1"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="maxHeight" className="text-sm font-medium text-muted-foreground">MAX HEIGHT</Label>
-            <Input
-              id="maxHeight"
-              type="number"
-              value={formData.maxHeight}
-              onChange={(e) => handleFieldChange('maxHeight', Number(e.target.value))}
-              className="mt-1"
-            />
+            <h4 className="text-sm font-semibold text-foreground mb-3">Calculation details</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="years" className="text-sm font-medium text-muted-foreground">YEARS RUNTIME</Label>
+                <Input
+                  id="years"
+                  type="number"
+                  value={formData.years}
+                  onChange={(e) => handleFieldChange('years', Number(e.target.value))}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="workdaysPerWeek" className="text-sm font-medium text-muted-foreground">WORKDAYS / WEEK</Label>
+                <Input
+                  id="workdaysPerWeek"
+                  type="number"
+                  value={formData.workdaysPerWeek}
+                  onChange={(e) => handleFieldChange('workdaysPerWeek', Number(e.target.value))}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="energyPriceEurPerKwh" className="text-sm font-medium text-muted-foreground">ENERGY PRICE (€/kWh)</Label>
+                <Input
+                  id="energyPriceEurPerKwh"
+                  type="number"
+                  step="0.001"
+                  value={formData.energyPriceEurPerKwh}
+                  onChange={(e) => handleFieldChange('energyPriceEurPerKwh', Number(e.target.value))}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="waterPriceEurPerL" className="text-sm font-medium text-muted-foreground">WATER PRICE (€/L)</Label>
+                <Input
+                  id="waterPriceEurPerL"
+                  type="number"
+                  step="0.0001"
+                  value={formData.waterPriceEurPerL}
+                  onChange={(e) => handleFieldChange('waterPriceEurPerL', Number(e.target.value))}
+                  className="mt-1"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Right Column */}
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Constraints */}
           <div>
-            <Label htmlFor="contact" className="text-sm font-medium text-muted-foreground">CONTACT</Label>
-            <Input
-              id="contact"
-              value={formData.contact}
-              onChange={(e) => handleFieldChange('contact', e.target.value)}
-              className="mt-1"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="mail" className="text-sm font-medium text-muted-foreground">MAIL</Label>
-            <Input
-              id="mail"
-              type="email"
-              value={formData.mail}
-              onChange={(e) => handleFieldChange('mail', e.target.value)}
-              className="mt-1"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="subApplication" className="text-sm font-medium text-muted-foreground">SUB APPLICATION</Label>
-            <Input
-              id="subApplication"
-              value={formData.subApplication}
-              onChange={(e) => handleFieldChange('subApplication', e.target.value)}
-              className="mt-1"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="capacityPerDay" className="text-sm font-medium text-muted-foreground">CAPACITY / DAY</Label>
-            <Input
-              id="capacityPerDay"
-              type="number"
-              value={formData.capacityPerDay}
-              onChange={(e) => handleFieldChange('capacityPerDay', Number(e.target.value))}
-              className="mt-1"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="motorEfficiency" className="text-sm font-medium text-muted-foreground">MOTOR EFFICIENCY</Label>
-            <Input
-              id="motorEfficiency"
-              value={formData.motorEfficiency}
-              onChange={(e) => handleFieldChange('motorEfficiency', e.target.value)}
-              className="mt-1"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="maxLength" className="text-sm font-medium text-muted-foreground">MAX LENGTH</Label>
-            <Input
-              id="maxLength"
-              type="number"
-              value={formData.maxLength}
-              onChange={(e) => handleFieldChange('maxLength', Number(e.target.value))}
-              className="mt-1"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="maxWeight" className="text-sm font-medium text-muted-foreground">MAX WEIGHT</Label>
-            <Input
-              id="maxWeight"
-              type="number"
-              value={formData.maxWeight}
-              onChange={(e) => handleFieldChange('maxWeight', Number(e.target.value))}
-              className="mt-1"
-            />
+            <h4 className="text-sm font-semibold text-foreground mb-3">Constraints</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="protectionClass" className="text-sm font-medium text-muted-foreground">PROTECTION CLASS</Label>
+                <Input
+                  id="protectionClass"
+                  value={formData.protectionClass}
+                  onChange={(e) => handleFieldChange('protectionClass', e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="motorEfficiency" className="text-sm font-medium text-muted-foreground">MOTOR EFFICIENCY</Label>
+                <Input
+                  id="motorEfficiency"
+                  value={formData.motorEfficiency}
+                  onChange={(e) => handleFieldChange('motorEfficiency', e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="maxWidth" className="text-sm font-medium text-muted-foreground">MAX WIDTH (mm)</Label>
+                <Input
+                  id="maxWidth"
+                  type="number"
+                  value={formData.maxWidth}
+                  onChange={(e) => handleFieldChange('maxWidth', Number(e.target.value))}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="maxLength" className="text-sm font-medium text-muted-foreground">MAX LENGTH (mm)</Label>
+                <Input
+                  id="maxLength"
+                  type="number"
+                  value={formData.maxLength}
+                  onChange={(e) => handleFieldChange('maxLength', Number(e.target.value))}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="maxHeight" className="text-sm font-medium text-muted-foreground">MAX HEIGHT (mm)</Label>
+                <Input
+                  id="maxHeight"
+                  type="number"
+                  value={formData.maxHeight}
+                  onChange={(e) => handleFieldChange('maxHeight', Number(e.target.value))}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="maxWeight" className="text-sm font-medium text-muted-foreground">MAX WEIGHT (kg)</Label>
+                <Input
+                  id="maxWeight"
+                  type="number"
+                  value={formData.maxWeight}
+                  onChange={(e) => handleFieldChange('maxWeight', Number(e.target.value))}
+                  className="mt-1"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Calculate Button */}

@@ -27,6 +27,10 @@ class Project:
     width_mm: float
     height_mm: float
     weight_kg: float
+    # Calculation details stored with the project
+    years: int = 20
+    energy_price_eur_per_kwh: float = 0.25
+    water_price_eur_per_l: float = 0.002
 
     def to_dict(self) -> dict:
         """Convert the Project instance to a dictionary."""

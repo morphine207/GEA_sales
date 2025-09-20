@@ -19,6 +19,11 @@ export interface Project {
   subApplication: string;
   feedSolid: string;
   capacityPerDay: number;
+  // Calculation details
+  years: number;
+  workdaysPerWeek: number;
+  energyPriceEurPerKwh: number;
+  waterPriceEurPerL: number;
   protectionClass: string;
   motorEfficiency: string;
   maxWidth: number;

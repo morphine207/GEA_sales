@@ -19,6 +19,10 @@ export interface BackendProject {
   width_mm: number;
   height_mm: number;
   weight_kg: number;
+  // New calculation details
+  years?: number;
+  energy_price_eur_per_kwh?: number;
+  water_price_eur_per_l?: number;
 }
 
 export interface ProjectsListResponse {
@@ -110,13 +114,16 @@ export function mapFrontendProjectToBackend(p: Project): BackendProject {
     sub_application: p.subApplication,
     solids_percentage: Number(p.feedSolid) || 0,
     customer_throughput_per_day: p.capacityPerDay,
-    workdays_per_week: 5,
+    workdays_per_week: p.workdaysPerWeek || 5,
     protection_class: p.protectionClass,
     motor_efficiency: p.motorEfficiency,
     length_mm: p.maxLength,
     width_mm: p.maxWidth,
     height_mm: p.maxHeight,
     weight_kg: p.maxWeight,
+    years: p.years,
+    energy_price_eur_per_kwh: p.energyPriceEurPerKwh,
+    water_price_eur_per_l: p.waterPriceEurPerL,
   };
 }
 
@@ -132,6 +139,10 @@ export function mapBackendProjectToFrontend(bp: BackendProject): Project {
     subApplication: bp.sub_application,
     feedSolid: String(bp.solids_percentage ?? ""),
     capacityPerDay: bp.customer_throughput_per_day,
+    years: bp.years ?? 5,
+    workdaysPerWeek: bp.workdays_per_week ?? 5,
+    energyPriceEurPerKwh: bp.energy_price_eur_per_kwh ?? 0.25,
+    waterPriceEurPerL: bp.water_price_eur_per_l ?? 0.002,
     protectionClass: bp.protection_class,
     motorEfficiency: bp.motor_efficiency || "",
     maxWidth: bp.width_mm,
