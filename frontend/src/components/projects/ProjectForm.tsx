@@ -17,7 +17,7 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
   const navigate = useNavigate();
   const [formData, setFormData] = useState<Project>(project);
   const [hasCalculated, setHasCalculated] = useState(!isNewProject);
-  const [tcoResults, setTcoResults] = useState<Array<{ label: string; ca: number; cc: number; co: number; cm: number; total: number }>>([]);
+  const [tcoResults, setTcoResults] = useState<Array<{ name: string; ca: number; cc: number; co: number; cm: number; total: number }>>([]);
   const [isCalculating, setIsCalculating] = useState(false);
   const [calcError, setCalcError] = useState("");
   const tcoResultsRef = useRef<HTMLDivElement | null>(null);
@@ -50,15 +50,19 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
         workdays_per_week: formData.workdaysPerWeek,
       });
 
-      // Map backend minimal TCO results for rendering (label, Ca, Cc, Co, Cm, Total)
-      const mapped = (resp.tco_results || []).map(r => ({
-        label: r.label,
-        ca: r.ca,
-        cc: r.cc,
-        co: r.co,
-        cm: r.cm,
-        total: Array.isArray(r.monthly_cum_total) && r.monthly_cum_total.length > 0 ? r.monthly_cum_total[r.monthly_cum_total.length - 1] : (r.ca + r.cc + r.co + r.cm),
-      }));
+      // Map backend minimal TCO results for rendering using machine name (langtyp)
+      const mapped = (resp.tco_results || []).map((r, i) => {
+        const machine = resp.relevant_machines?.[i];
+        const name = (machine?.langtyp || "").toString().trim() || r.label;
+        return {
+          name,
+          ca: r.ca,
+          cc: r.cc,
+          co: r.co,
+          cm: r.cm,
+          total: Array.isArray(r.monthly_cum_total) && r.monthly_cum_total.length > 0 ? r.monthly_cum_total[r.monthly_cum_total.length - 1] : (r.ca + r.cc + r.co + r.cm),
+        };
+      });
       // Sort ascending by total cost
       mapped.sort((a, b) => a.total - b.total);
       setTcoResults(mapped);
@@ -92,14 +96,18 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
           workdays_per_week: formData.workdaysPerWeek,
         });
         if (!isMounted) return;
-        const mapped = (resp.tco_results || []).map(r => ({
-          label: r.label,
-          ca: r.ca,
-          cc: r.cc,
-          co: r.co,
-          cm: r.cm,
-          total: Array.isArray(r.monthly_cum_total) && r.monthly_cum_total.length > 0 ? r.monthly_cum_total[r.monthly_cum_total.length - 1] : (r.ca + r.cc + r.co + r.cm),
-        }));
+        const mapped = (resp.tco_results || []).map((r, i) => {
+          const machine = resp.relevant_machines?.[i];
+          const name = (machine?.langtyp || "").toString().trim() || r.label;
+          return {
+            name,
+            ca: r.ca,
+            cc: r.cc,
+            co: r.co,
+            cm: r.cm,
+            total: Array.isArray(r.monthly_cum_total) && r.monthly_cum_total.length > 0 ? r.monthly_cum_total[r.monthly_cum_total.length - 1] : (r.ca + r.cc + r.co + r.cm),
+          };
+        });
         mapped.sort((a, b) => a.total - b.total);
         setTcoResults(mapped);
         setHasCalculated(true);
@@ -214,7 +222,7 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
               />
             </div>
             <div>
-              <Label htmlFor="capacityPerDay" className="text-sm font-medium text-muted-foreground">CAPACITY / DAY</Label>
+              <Label htmlFor="capacityPerDay" className="text-sm font-medium text-muted-foreground">INPUT / DAY</Label>
               <Input
                 id="capacityPerDay"
                 type="number"
@@ -350,7 +358,12 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
               CALCULATE
             </Button>
             <Button
-              onClick={() => {}}
+              onClick={() => {
+                if (tcoResults.length > 0) {
+                  navigate(`/project/${encodeURIComponent(formData.projectName)}/compare`);
+                }
+              }}
+              disabled={tcoResults.length === 0}
               className={`${tcoResults.length > 0 ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-muted text-muted-foreground hover:bg-muted'} w-full py-2.5 text-sm md:text-base`}
             >
               COMPARE
@@ -384,7 +397,7 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
             <>
               {/* Backend results table */}
               <div className="grid grid-cols-6 gap-4 px-4 py-2 text-sm font-medium text-muted-foreground border-b border-border">
-                <div>LABEL</div>
+                <div>MACHINE</div>
                 <div>Acquisition</div>
                 <div>Commissioning</div>
                 <div>Operating</div>
@@ -394,7 +407,7 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
               {tcoResults.map((r, idx) => (
                 <Card key={idx} className="p-4 bg-accent/10">
                   <div className="grid grid-cols-6 gap-4 items-center">
-                    <div className="font-medium text-foreground">{r.label}</div>
+                    <div className="font-medium text-foreground">{r.name}</div>
                     <div className="text-foreground">{formatCurrency(r.ca)}</div>
                     <div className="text-foreground">{formatCurrency(r.cc)}</div>
                     <div className="text-foreground">{formatCurrency(r.co)}</div>
