@@ -93,6 +93,12 @@ class ProjectTCOResponse(BaseModel):
     message: str
 
 
+class MachinesListResponse(BaseModel):
+    success: bool
+    count: int
+    machines: List[dict]
+
+
 @router.get("/projects", response_model=ProjectsListResponse)
 async def get_projects():
     """Get all projects."""
@@ -229,6 +235,23 @@ async def calculate_project_tco(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error calculating project TCO: {str(e)}")
+
+
+@router.get("/machines", response_model=MachinesListResponse)
+async def list_machines():
+    """Return all machines loaded from the CSV file."""
+    try:
+        csv_path = os.path.join(os.path.dirname(__file__), '..', 'calculation_engine', 'machines.csv')
+        machines = load_machines_from_csv(csv_path)
+        return MachinesListResponse(
+            success=True,
+            count=len(machines),
+            machines=[m.to_dict() for m in machines]
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading machines: {str(e)}")
 
 
 @router.get("/health")

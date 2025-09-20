@@ -26,9 +26,9 @@ export function ProjectsList({ projects, onProjectClick }: ProjectsListProps) {
     }).format(amount);
   };
 
-  // TCO will be calculated in detail view; keep column but show placeholder
-  const getMostCostEffectiveTCO = (_project: Project): string => {
-    return "—";
+  const getMostCostEffectiveTCO = (p: Project): string => {
+    if (!p || !Number.isFinite(p.tcoTotal) || p.tcoTotal <= 0) return "—";
+    return formatCurrency(p.tcoTotal);
   };
 
   return (

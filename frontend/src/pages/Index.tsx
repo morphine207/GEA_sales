@@ -5,7 +5,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { ProjectsList } from "@/components/projects/ProjectsList";
 import { MachineSpecsTable } from "@/components/machines/MachineSpecsTable";
 import { Project } from "@/types/project";
-import { apiListProjects, mapBackendProjectToFrontend } from "@/lib/api";
+import { apiListProjects, mapBackendProjectToFrontend, apiCalculateProjectTCO } from "@/lib/api";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -34,6 +34,32 @@ const Index = () => {
         if (!isMounted) return;
         const mapped = resp.projects.map(mapBackendProjectToFrontend);
         setProjects(mapped);
+        // Auto-calculate TCO for each project after loading
+        // Update each project in state as results arrive
+        for (const p of mapped) {
+          (async () => {
+            try {
+              const tcoResp = await apiCalculateProjectTCO(p.projectName, {
+                years: p.years,
+                electricity_eur_per_kwh: p.energyPriceEurPerKwh,
+                water_eur_per_l: p.waterPriceEurPerL,
+                operation_hours_per_day: 16,
+                workdays_per_week: p.workdaysPerWeek,
+              });
+              const totals = (tcoResp.tco_results || []).map(r => {
+                const last = Array.isArray(r.monthly_cum_total) && r.monthly_cum_total.length > 0
+                  ? r.monthly_cum_total[r.monthly_cum_total.length - 1]
+                  : (r.ca + r.cc + r.co + r.cm);
+                return last;
+              });
+              const minTotal = totals.length ? Math.min(...totals) : 0;
+              if (!isMounted) return;
+              setProjects(prev => prev.map(pr => pr.id === p.id ? { ...pr, tcoTotal: minTotal } : pr));
+            } catch (e) {
+              // ignore TCO errors for list view; keep placeholder
+            }
+          })();
+        }
         setError("");
       } catch (e: any) {
         if (!isMounted) return;

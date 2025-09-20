@@ -65,6 +65,42 @@ export interface ProjectTCOResponse {
   message: string;
 }
 
+// Machines API types (mirrors backend MachineData fields)
+export interface BackendMachine {
+  application: string;
+  sub_application: string;
+  feed_solids_min_vol_perc: number;
+  feed_solids_max_vol_perc: number;
+  capacity_min_inp: number;
+  capacity_max_inp: number;
+  drive_type: string;
+  level: string;
+  langtyp: string;
+  dmr: number;
+  list_price: number;
+  motor_power_kw: number;
+  protection_class: string;
+  motor_efficiency?: string | null;
+  op_water_supply_bar: number;
+  op_water_l_s: number;
+  op_water_l_it_eject: number;
+  length_mm: number;
+  width_mm: number;
+  height_mm: number;
+  total_weight_kg: number;
+  bowl_weight_kg: number;
+  motor_weight_kg: number;
+  bowl_volume_lit: number;
+  ejection_system: string;
+  power_consumption_total_kw: number;
+}
+
+export interface MachinesListResponse {
+  success: boolean;
+  count: number;
+  machines: BackendMachine[];
+}
+
 async function http<T>(path: string, options?: RequestInit): Promise<T> {
   const resp = await fetch(`${API_BASE_URL}${path}`, {
     headers: { "Content-Type": "application/json", ...(options?.headers || {}) },
@@ -101,6 +137,10 @@ export function apiCalculateProjectTCO(projectName: string, payload: TCOCalculat
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export function apiListMachines() {
+  return http<MachinesListResponse>(`/api/calculation/machines`);
 }
 
 export function mapFrontendProjectToBackend(p: Project): BackendProject {

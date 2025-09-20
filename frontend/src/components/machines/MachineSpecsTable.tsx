@@ -1,12 +1,98 @@
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useMemo, useState } from "react";
-import { machineSpecifications } from "@/data/machineSpecifications";
+import { useEffect, useMemo, useState } from "react";
+import { apiListMachines, BackendMachine } from "@/lib/api";
+
+type UIMachine = {
+  application: string;
+  subApplication: string;
+  feedSolidsMin: number;
+  feedSolidsMax: number;
+  capacityMinInp: number;
+  capacityMaxInp: number;
+  driveType: string;
+  level: string;
+  modelNumber: string;
+  bowlDiameter: number;
+  listPrice: number;
+  motorPowerKW: number;
+  protectionClass: string;
+  motorEfficiency: string;
+  waterSupplyBar: number;
+  waterFlowLs: number;
+  waterPerEjectionL: number;
+  length: number;
+  width: number;
+  height: number;
+  totalWeightKg: number;
+  bowlWeightKg: number;
+  motorWeightKg: number;
+  bowlVolumeL: number;
+  ejectionSystem: string;
+  powerConsumptionTotalKW: number;
+};
+
+function mapBackendMachineToUI(m: BackendMachine): UIMachine {
+  const model = (m.langtyp || "").trim();
+  const modelFallback = [m.application, m.sub_application, Number.isFinite(m.dmr) ? `DMR ${Math.round(m.dmr)}mm` : ""].filter(Boolean).join(" – ");
+  return {
+    application: m.application || "",
+    subApplication: m.sub_application || "",
+    feedSolidsMin: Number(m.feed_solids_min_vol_perc) || 0,
+    feedSolidsMax: Number(m.feed_solids_max_vol_perc) || 0,
+    capacityMinInp: Number(m.capacity_min_inp) || 0,
+    capacityMaxInp: Number(m.capacity_max_inp) || 0,
+    driveType: m.drive_type || "",
+    level: m.level || "",
+    modelNumber: model || modelFallback || "Machine",
+    bowlDiameter: Number(m.dmr) || 0,
+    listPrice: Number(m.list_price) || 0,
+    motorPowerKW: Number(m.motor_power_kw) || 0,
+    protectionClass: m.protection_class || "",
+    motorEfficiency: (m.motor_efficiency || "-").toString(),
+    waterSupplyBar: Number(m.op_water_supply_bar) || 0,
+    waterFlowLs: Number(m.op_water_l_s) || 0,
+    waterPerEjectionL: Number(m.op_water_l_it_eject) || 0,
+    length: Number(m.length_mm) || 0,
+    width: Number(m.width_mm) || 0,
+    height: Number(m.height_mm) || 0,
+    totalWeightKg: Number(m.total_weight_kg) || 0,
+    bowlWeightKg: Number(m.bowl_weight_kg) || 0,
+    motorWeightKg: Number(m.motor_weight_kg) || 0,
+    bowlVolumeL: Number(m.bowl_volume_lit) || 0,
+    ejectionSystem: m.ejection_system || "",
+    powerConsumptionTotalKW: Number(m.power_consumption_total_kw) || 0,
+  };
+}
 
 export function MachineSpecsTable() {
   const [searchTerm, setSearchTerm] = useState("");
   const [applicationFilter, setApplicationFilter] = useState<string>("all");
+  const [machines, setMachines] = useState<UIMachine[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>("");
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        const resp = await apiListMachines();
+        if (!isMounted) return;
+        const mapped = resp.machines.map(mapBackendMachineToUI);
+        setMachines(mapped);
+        setError("");
+      } catch (e: any) {
+        if (!isMounted) return;
+        setMachines([]);
+        setError("Failed to load machines from backend.");
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    })();
+    return () => { isMounted = false; };
+  }, []);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('de-DE', {
@@ -22,21 +108,21 @@ export function MachineSpecsTable() {
   };
 
   const applications = useMemo(() => {
-    const set = new Set<string>(machineSpecifications.map(m => m.application));
+    const set = new Set<string>(machines.map(m => m.application));
     return ["all", ...Array.from(set)];
-  }, []);
+  }, [machines]);
 
   const filteredMachines = useMemo(() => {
     const lower = searchTerm.toLowerCase();
-    return machineSpecifications.filter((m) => {
+    return machines.filter((m) => {
       const matchesSearch =
-        m.modelNumber.toLowerCase().includes(lower) ||
-        m.application.toLowerCase().includes(lower) ||
-        m.subApplication.toLowerCase().includes(lower);
+        (m.modelNumber || "").toLowerCase().includes(lower) ||
+        (m.application || "").toLowerCase().includes(lower) ||
+        (m.subApplication || "").toLowerCase().includes(lower);
       const matchesApp = applicationFilter === "all" || m.application === applicationFilter;
       return matchesSearch && matchesApp;
     });
-  }, [searchTerm, applicationFilter]);
+  }, [machines, searchTerm, applicationFilter]);
 
   return (
     <div className="p-6 space-y-6">
@@ -65,6 +151,12 @@ export function MachineSpecsTable() {
       </div>
 
       <div className="overflow-x-auto">
+        {loading && (
+          <Card className="p-6 mt-4 text-sm text-muted-foreground">Loading machines…</Card>
+        )}
+        {!loading && error && (
+          <Card className="p-6 mt-4 text-sm text-red-600">{error}</Card>
+        )}
         <div className="min-w-full">
           <div className="grid grid-cols-12 md:grid-cols-13 gap-2 px-4 py-3 text-xs font-medium text-muted-foreground border-b border-border bg-muted/30 rounded-t-lg">
             <div className="col-span-2">MODEL & APPLICATION</div>

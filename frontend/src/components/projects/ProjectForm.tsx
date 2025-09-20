@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Project, Machine } from "@/types/project";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,6 +70,45 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
       setIsCalculating(false);
     }
   };
+
+  // Auto-calc on mount for existing projects
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      if (isNewProject) return;
+      try {
+        setIsCalculating(true);
+        setCalcError("");
+        const resp = await apiCalculateProjectTCO(formData.projectName, {
+          years: formData.years,
+          electricity_eur_per_kwh: formData.energyPriceEurPerKwh,
+          water_eur_per_l: formData.waterPriceEurPerL,
+          operation_hours_per_day: 16,
+          workdays_per_week: formData.workdaysPerWeek,
+        });
+        if (!isMounted) return;
+        const mapped = (resp.tco_results || []).map(r => ({
+          label: r.label,
+          ca: r.ca,
+          cc: r.cc,
+          co: r.co,
+          cm: r.cm,
+          total: Array.isArray(r.monthly_cum_total) && r.monthly_cum_total.length > 0 ? r.monthly_cum_total[r.monthly_cum_total.length - 1] : (r.ca + r.cc + r.co + r.cm),
+        }));
+        mapped.sort((a, b) => a.total - b.total);
+        setTcoResults(mapped);
+        setHasCalculated(true);
+      } catch (e) {
+        if (!isMounted) return;
+        setCalcError("Backend calculation failed.");
+        setTcoResults([]);
+      } finally {
+        if (isMounted) setIsCalculating(false);
+      }
+    })();
+    return () => { isMounted = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isNewProject, formData.projectName]);
 
   return (
     <div className="p-6 space-y-6">
