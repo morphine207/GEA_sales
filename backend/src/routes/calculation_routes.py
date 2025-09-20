@@ -200,8 +200,18 @@ async def calculate_project_tco(
         csv_path = os.path.join(os.path.dirname(__file__), '..', 'calculation_engine', 'machines.csv')
         all_machines = load_machines_from_csv(csv_path)
         
-        # Filter machines based on project requirements
-        relevant_machines = filter_machines_for_project(all_machines, project)
+        # Determine effective hours/day for filtering when using throughput
+        has_throughput = (
+            request.throughput_per_day is not None or project.customer_throughput_per_day is not None
+        )
+        filter_hours_per_day = (
+            request.operation_hours_per_day
+            if request.operation_hours_per_day is not None
+            else (20 if has_throughput else None)
+        )
+
+        # Filter machines based on project requirements and available hours/day
+        relevant_machines = filter_machines_for_project(all_machines, project, operation_hours_per_day=filter_hours_per_day)
         
         if not relevant_machines:
             return ProjectTCOResponse(

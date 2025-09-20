@@ -61,6 +61,7 @@ export default function Compare() {
   // Slider state
   const [years, setYears] = useState<number>(5);
   const [throughputPerDay, setThroughputPerDay] = useState<number>(0);
+  const [operationHoursPerDay, setOperationHoursPerDay] = useState<number>(20);
   const [electricityEurPerKwh, setElectricityEurPerKwh] = useState<number>(0.25);
   const [waterEurPerL, setWaterEurPerL] = useState<number>(0.002);
   const initialThroughputRef = useRef<number>(0);
@@ -109,6 +110,7 @@ export default function Compare() {
         water_eur_per_l: waterEurPerL,
         throughput_per_day: throughputPerDay,
         workdays_per_week: project.workdaysPerWeek,
+        operation_hours_per_day: operationHoursPerDay,
         ...(payloadOverrides || {}),
       });
       const combined = (resp.tco_results || []).map((r, i) => {
@@ -116,7 +118,7 @@ export default function Compare() {
         const name = (machine?.langtyp || "").toString().trim() || r.label;
         const total = r.monthly_cum_total?.[r.monthly_cum_total.length - 1] ?? 0;
         const maxPerHour = Number(machine?.capacity_max_inp) || 0;
-        const maxPerDay = maxPerHour * 20; // assume up to 20h/day of operation
+        const maxPerDay = maxPerHour * (operationHoursPerDay || 20);
         const capacityOk = (throughputPerDay || 0) <= maxPerDay;
         return { name, monthly_cum_total: r.monthly_cum_total, ca: r.ca, cc: r.cc, co: r.co, cm: r.cm, capacityOk, _total: total } as SeriesItem & { _total: number };
       });
@@ -132,11 +134,11 @@ export default function Compare() {
       const currentMap = new Map(top3All.map(s => [s.name, s]));
       setDisplaySlots(prev => {
         if (!prev.length) {
-          return top3All.map(s => ({ name: s.name, valid: s.capacityOk, reason: s.capacityOk ? undefined : "Capacity surpassed", data: s.capacityOk ? s : undefined })).slice(0, 3);
+          return top3All.map(s => ({ name: s.name, valid: s.capacityOk, reason: s.capacityOk ? undefined : `Capacity surpassed at ${operationHoursPerDay} h/day`, data: s.capacityOk ? s : undefined })).slice(0, 3);
         }
         return prev.map(slot => {
           const s = currentMap.get(slot.name);
-          if (s) return { name: slot.name, valid: s.capacityOk, reason: s.capacityOk ? undefined : "Capacity surpassed", data: s.capacityOk ? s : undefined };
+          if (s) return { name: slot.name, valid: s.capacityOk, reason: s.capacityOk ? undefined : `Capacity surpassed at ${operationHoursPerDay} h/day`, data: s.capacityOk ? s : undefined };
           return { ...slot, valid: false, reason: "Not valid at current settings", data: undefined };
         });
       });
@@ -232,6 +234,7 @@ export default function Compare() {
         electricity_eur_per_kwh: electricityEurPerKwh,
         water_eur_per_l: waterEurPerL,
         workdays_per_week: project?.workdaysPerWeek,
+        operation_hours_per_day: operationHoursPerDay,
       },
       tcoResults,
       machines,
@@ -301,6 +304,11 @@ export default function Compare() {
                 <div className="text-xs text-muted-foreground mb-2">Input per day (L/day)</div>
                 <Slider value={[throughputPerDay]} min={0} max={(initialThroughputRef.current || 0) * 5} step={100} onValueChange={v => setThroughputPerDay(v[0])} onValueCommit={() => fetchData()} />
                 <div className="text-xs mt-1">{throughputPerDay} L/day</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-2">Operation hours per day (h)</div>
+                <Slider value={[operationHoursPerDay]} min={1} max={24} step={1} onValueChange={v => setOperationHoursPerDay(v[0])} onValueCommit={() => fetchData()} />
+                <div className="text-xs mt-1">{operationHoursPerDay} h/day</div>
               </div>
               <div>
                 <div className="text-xs text-muted-foreground mb-2">Electricity cost (€/kWh)</div>

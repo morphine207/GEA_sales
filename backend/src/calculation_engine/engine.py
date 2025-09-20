@@ -232,7 +232,7 @@ def save_machines_to_json(machines: List[MachineData], filepath: str) -> None:
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump([m.to_dict() for m in machines], f, ensure_ascii=False, indent=2)
 
-def _machine_meets_project_constraints(machine: MachineData, project) -> bool:
+def _machine_meets_project_constraints(machine: MachineData, project, *, operation_hours_per_day: Optional[float] = None) -> bool:
     """
     Shared validation to decide if a machine configuration is legit for a given project.
 
@@ -250,7 +250,7 @@ def _machine_meets_project_constraints(machine: MachineData, project) -> bool:
     if not (machine.feed_solids_min_vol_perc <= project.solids_percentage <= machine.feed_solids_max_vol_perc):
         return False
 
-    # Throughput vs hours/day cap (20h)
+    # Throughput vs hours/day cap (configurable, defaults to 20h if not provided)
     try:
         throughput_per_day = float(project.customer_throughput_per_day)
     except Exception:
@@ -261,7 +261,8 @@ def _machine_meets_project_constraints(machine: MachineData, project) -> bool:
         if capacity_max <= 0:
             return False
         required_hours_per_day = throughput_per_day / capacity_max
-        if required_hours_per_day > 20.0:
+        allowed_hours_per_day = float(operation_hours_per_day) if (operation_hours_per_day is not None and not math.isnan(float(operation_hours_per_day))) else 20.0
+        if required_hours_per_day > allowed_hours_per_day:
             return False
 
     # Protection class
@@ -295,7 +296,7 @@ def _machine_meets_project_constraints(machine: MachineData, project) -> bool:
 
     return True
 
-def filter_machines_for_project(machines: List[MachineData], project) -> List[MachineData]:
+def filter_machines_for_project(machines: List[MachineData], project, *, operation_hours_per_day: Optional[float] = None) -> List[MachineData]:
     """
     Filter machines based on project requirements.
     
@@ -328,7 +329,7 @@ def filter_machines_for_project(machines: List[MachineData], project) -> List[Ma
             continue
 
         # Shared comprehensive constraint check
-        if not _machine_meets_project_constraints(machine, project):
+        if not _machine_meets_project_constraints(machine, project, operation_hours_per_day=operation_hours_per_day):
             continue
         
         relevant_machines.append(machine)
