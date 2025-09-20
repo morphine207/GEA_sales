@@ -4,9 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ReadOnlyMachineRow } from "./ReadOnlyMachineRow";
 import { useNavigate } from "react-router-dom";
-import { machineSpecifications } from "@/data/machineSpecifications";
+import { apiCalculateProjectTCO } from "@/lib/api";
 
 interface ProjectFormProps {
   project: Project;
@@ -18,6 +17,9 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
   const navigate = useNavigate();
   const [formData, setFormData] = useState<Project>(project);
   const [hasCalculated, setHasCalculated] = useState(!isNewProject);
+  const [tcoResults, setTcoResults] = useState<Array<{ label: string; ca: number; cc: number; co: number; cm: number; total: number }>>([]);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [calcError, setCalcError] = useState("");
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('de-DE', {
@@ -28,102 +30,45 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
     }).format(amount);
   };
 
-  const calculateMachineTCO = (machine: Machine): number => {
-    return machine.listPrice + machine.totalOperationCosts + machine.totalMaintenanceCosts;
-  };
-
   const handleFieldChange = (field: keyof Project, value: string | number) => {
     const updatedProject = { ...formData, [field]: value };
     setFormData(updatedProject);
   };
 
-  const getTop3CheapestMachines = (): Machine[] => {
-    // Get existing machine names in this project to avoid duplicates
-    const existingMachineNames = formData.machines.map(m => m.name);
-    
-    // Select 3 different machines from the specifications database, excluding ones already in project
-    const availableSpecs = machineSpecifications.filter(spec => 
-      !existingMachineNames.includes(spec.modelNumber)
-    );
-    
-    // Pick diverse machines with different price points
-    const selectedSpecs = [
-      availableSpecs.find(spec => spec.application === "Wine"),
-      availableSpecs.find(spec => spec.application === "Tea"),
-      availableSpecs.find(spec => spec.application === "Citrus"),
-      availableSpecs.find(spec => spec.application === "Beer"),
-      availableSpecs.find(spec => spec.application === "Fruit Juice")
-    ].filter(spec => spec !== undefined).slice(0, 3);
+  const handleCalculate = async () => {
+    // Call backend TCO calculation using the project name as identifier
+    try {
+      setIsCalculating(true);
+      setCalcError("");
+      await onUpdate(formData); // ensure project is saved before calculation
+      const resp = await apiCalculateProjectTCO(formData.projectName, {
+        years: 5,
+        electricity_eur_per_kwh: 0.25,
+        water_eur_per_l: 0.002,
+        operation_hours_per_day: 16,
+        workdays_per_week: 5,
+      });
 
-    // If we still don't have 3 unique machines, add more from remaining available specs
-    if (selectedSpecs.length < 3) {
-      const additionalSpecs = availableSpecs.filter(spec => !selectedSpecs.includes(spec))
-        .slice(0, 3 - selectedSpecs.length);
-      selectedSpecs.push(...additionalSpecs);
+      // Map backend minimal TCO results for rendering (label, Ca, Cc, Co, Cm, Total)
+      const mapped = (resp.tco_results || []).map(r => ({
+        label: r.label,
+        ca: r.ca,
+        cc: r.cc,
+        co: r.co,
+        cm: r.cm,
+        total: Array.isArray(r.monthly_cum_total) && r.monthly_cum_total.length > 0 ? r.monthly_cum_total[r.monthly_cum_total.length - 1] : (r.ca + r.cc + r.co + r.cm),
+      }));
+      // Sort ascending by total cost
+      mapped.sort((a, b) => a.total - b.total);
+      setTcoResults(mapped);
+
+      setHasCalculated(true);
+    } catch (e) {
+      setCalcError("Backend calculation failed.");
+      setTcoResults([]);
+    } finally {
+      setIsCalculating(false);
     }
-
-    const exampleMachines: Machine[] = selectedSpecs.map((spec, index) => ({
-      id: `example-${index + 1}`,
-      projectId: formData.id,
-      name: spec!.modelNumber, // Use actual model number as name
-      listPrice: spec!.listPrice,
-      totalOperationCosts: Math.round(spec!.powerConsumptionTotalKW * 0.156 * 4000), // Realistic operating costs based on power consumption
-      totalMaintenanceCosts: Math.round(spec!.listPrice * 0.08), // 8% of list price for maintenance
-      tco: 0 // Will be calculated below
-    }));
-
-    // Calculate TCO for example machines
-    exampleMachines.forEach(machine => {
-      machine.tco = machine.listPrice + machine.totalOperationCosts + machine.totalMaintenanceCosts;
-    });
-
-    // Sort by TCO ascending (most cost-effective first)
-    exampleMachines.sort((a, b) => a.tco - b.tco);
-
-    // If we have actual machine data, calculate and sort them by TCO ascending
-    if (formData.machines.length > 0) {
-      const calculatedMachines = [...formData.machines]
-        .map(machine => ({
-          ...machine,
-          tco: calculateMachineTCO(machine)
-        }))
-        .sort((a, b) => a.tco - b.tco);
-
-      // Return top 3 calculated machines, pad with unique machine examples if needed
-      const result = [...calculatedMachines];
-      let exampleIndex = 0;
-      while (result.length < 3 && exampleIndex < exampleMachines.length) {
-        // Only add if the machine name is not already in the result
-        const machineToAdd = exampleMachines[exampleIndex];
-        if (!result.some(existing => existing.name === machineToAdd.name)) {
-          result.push(machineToAdd);
-        }
-        exampleIndex++;
-      }
-      
-      // Final sort to ensure everything is in TCO ascending order
-      return result.sort((a, b) => a.tco - b.tco).slice(0, 3);
-    }
-
-    // If no machines, return the 3 unique machines sorted by TCO ascending
-    return exampleMachines.slice(0, 3);
-  };
-
-  const handleCalculate = () => {
-    const recalculatedMachines = formData.machines.map(machine => ({
-      ...machine,
-      tco: calculateMachineTCO(machine)
-    }));
-
-    const updatedProject = {
-      ...formData,
-      machines: recalculatedMachines,
-      updatedAt: new Date()
-    };
-
-    setFormData(updatedProject);
-    setHasCalculated(true);
-    onUpdate(updatedProject);
   };
 
   return (
@@ -312,34 +257,53 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
         </div>
       </div>
 
-      {/* Machines Section - Most Cost-Effective */}
+      {/* TCO Results Section */}
       {hasCalculated && (
         <div className="mt-8">
           <div className="mb-4">
             <h3 className="text-lg font-semibold text-foreground">MOST COST-EFFECTIVE MACHINES (TCO)</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              These are the 3 most cost-effective machines based on Total Cost of Ownership
-            </p>
+            {isCalculating && (
+              <p className="text-sm text-muted-foreground mt-1">Calculating…</p>
+            )}
+            {!isCalculating && (
+              <p className="text-sm text-muted-foreground mt-1">
+                {tcoResults.length > 0
+                  ? "Calculated from backend for relevant machines"
+                  : "No results yet"}
+              </p>
+            )}
+            {calcError && (
+              <p className="text-sm text-red-600 mt-1">{calcError}</p>
+            )}
           </div>
 
         <div className="space-y-2">
-          {/* Header */}
-          <div className="grid grid-cols-5 gap-4 px-4 py-2 text-sm font-medium text-muted-foreground border-b border-border">
-            <div>MACHINE NAME</div>
-            <div>LIST PRICE</div>
-            <div>OPERATING COSTS</div>
-            <div>MAINTENANCE COSTS</div>
-            <div>TCO €</div>
-          </div>
+          {tcoResults.length > 0 ? (
+            <>
+              {/* Backend results table */}
+              <div className="grid grid-cols-6 gap-4 px-4 py-2 text-sm font-medium text-muted-foreground border-b border-border">
+                <div>LABEL</div>
+                <div>Ca</div>
+                <div>Cc</div>
+                <div>Co</div>
+                <div>Cm</div>
+                <div>TOTAL</div>
+              </div>
+              {tcoResults.map((r, idx) => (
+                <Card key={idx} className="p-4 bg-accent/10">
+                  <div className="grid grid-cols-6 gap-4 items-center">
+                    <div className="font-medium text-foreground">{r.label}</div>
+                    <div className="text-foreground">{formatCurrency(r.ca)}</div>
+                    <div className="text-foreground">{formatCurrency(r.cc)}</div>
+                    <div className="text-foreground">{formatCurrency(r.co)}</div>
+                    <div className="text-foreground">{formatCurrency(r.cm)}</div>
+                    <div className="font-bold text-primary text-lg">{formatCurrency(r.total)}</div>
+                  </div>
+                </Card>
+              ))}
+            </>
+          ) : null}
 
-          {/* Top 3 Machine Rows - Always show 3 with comprehensive data */}
-          {getTop3CheapestMachines().map((machine) => (
-            <ReadOnlyMachineRow
-              key={machine.id}
-              machine={machine}
-            />
-          ))}
-          
           {/* TCO Formula Info */}
           <div className="mt-4 p-3 bg-muted/30 rounded-md">
             <p className="text-xs text-muted-foreground">

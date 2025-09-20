@@ -22,65 +22,68 @@ from .engine import (
 )
 
 def create_demo_projects() -> List[Project]:
-    """Create demo projects for testing."""
-    
+    """Create demo projects that match machines in the CSV so filtering returns results."""
+
+    # Matches Wine machines (e.g., GFA 40-87-600 / GFA 40-12-596)
     demo_project_1 = Project(
-        project_name="Dairy Processing Plant A",
-        company_name="MilkCorp Industries",
-        telefon_nummer="+49 123 456 7890",
-        email="contact@milcorp.com",
-        contact_person="Hans Mueller",
-        application="Dairy",
-        sub_application="Milk Separation",
-        solids_percentage=12.5,
-        customer_throughput_per_day=5000.0,
+        project_name="Wine Project Demo",
+        company_name="Acme Wine Corp",
+        telefon_nummer="+49 123 456 789",
+        email="sales@acmewine.com",
+        contact_person="John Smith",
+        application="Wine",
+        sub_application="Clarific. of Sparkling Wine",
+        solids_percentage=0.4,  # within 0.3–0.5
+        customer_throughput_per_day=5000.0,  # within 5,000–9,000
         workdays_per_week=5,
-        protection_class="IP65",
+        protection_class="IP55",
         motor_efficiency="≥ IE3",
         length_mm=2500.0,
         width_mm=1800.0,
         height_mm=2200.0,
-        weight_kg=4500.0
+        weight_kg=850.0,
     )
-    
+
+    # Matches Beer machines (e.g., GFA 200-98-270 / GFA 200-18-944)
     demo_project_2 = Project(
-        project_name="Brewery Centrifuge System",
-        company_name="Bavarian Brewery Co.",
-        telefon_nummer="+49 987 654 3210",
-        email="engineering@bavarianbrewery.de",
-        contact_person="Maria Schmidt",
-        application="Brewery",
-        sub_application="Wort Clarification",
-        solids_percentage=8.2,
-        customer_throughput_per_day=8000.0,
-        workdays_per_week=6,
-        protection_class="IP54",
-        motor_efficiency="≥ IE4",
-        length_mm=3200.0,
+        project_name="Beer Project Demo",
+        company_name="Bavarian Brewery",
+        telefon_nummer="+49 987 654 321",
+        email="engineering@bavarianbrew.de",
+        contact_person="Maria Mueller",
+        application="Beer",
+        sub_application="Clarification of Kwass",
+        solids_percentage=0.3,  # within 0.2–0.5
+        customer_throughput_per_day=20000.0,  # within 16,000–26,000
+        workdays_per_week=5,
+        protection_class="IP00",  # match machine requirement
+        motor_efficiency=None,  # machines have '-' → treat as no requirement
+        length_mm=3000.0,
         width_mm=2000.0,
-        height_mm=2800.0,
-        weight_kg=6200.0
+        height_mm=2400.0,
+        weight_kg=1200.0,
     )
-    
+
+    # Matches Tea machines (e.g., GFA 10-50-645)
     demo_project_3 = Project(
-        project_name="Pharmaceutical Separation Unit",
-        company_name="MedPharm Solutions",
-        telefon_nummer="+49 555 123 4567",
-        email="projects@medpharm.de",
-        contact_person="Dr. Anna Weber",
-        application="Pharmaceutical",
-        sub_application="API Purification",
-        solids_percentage=5.8,
-        customer_throughput_per_day=2000.0,
-        workdays_per_week=7,
-        protection_class="IP67",
-        motor_efficiency="≥ IE4",
-        length_mm=1800.0,
+        project_name="Tea Processing Line",
+        company_name="Alpine Tea Co",
+        telefon_nummer="+41 555 123 456",
+        email="contact@alpinetee.ch",
+        contact_person="Hans Weber",
+        application="Tea",
+        sub_application="Clarification of RTD Tea",
+        solids_percentage=0.3,  # within 0.2–0.5
+        customer_throughput_per_day=1500.0,  # within 1,000–1,800
+        workdays_per_week=5,
+        protection_class="IP55",
+        motor_efficiency="≥ IE3",
+        length_mm=2000.0,
         width_mm=1200.0,
         height_mm=2000.0,
-        weight_kg=3200.0
+        weight_kg=650.0,
     )
-    
+
     return [demo_project_1, demo_project_2, demo_project_3]
 
 def get_demo_data():

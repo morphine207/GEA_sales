@@ -4,14 +4,16 @@ import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ProjectsList } from "@/components/projects/ProjectsList";
 import { MachineSpecsTable } from "@/components/machines/MachineSpecsTable";
-import { mockProjects } from "@/data/mockData";
 import { Project } from "@/types/project";
-import { createNewProject } from "@/utils/projectUtils";
+import { apiListProjects, mapBackendProjectToFrontend } from "@/lib/api";
 
 const Index = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeMenuItem, setActiveMenuItem] = useState("projects");
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>("");
 
   // Handle URL parameters for section navigation
   useEffect(() => {
@@ -21,6 +23,28 @@ const Index = () => {
       setActiveMenuItem(section);
     }
   }, [location.search]);
+
+  // Load projects from backend
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        const resp = await apiListProjects();
+        if (!isMounted) return;
+        const mapped = resp.projects.map(mapBackendProjectToFrontend);
+        setProjects(mapped);
+        setError("");
+      } catch (e: any) {
+        if (!isMounted) return;
+        setProjects([]);
+        setError("Failed to load projects from backend.");
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    })();
+    return () => { isMounted = false; };
+  }, []);
 
   const handleNewProject = () => {
     // Navigate to the new project route
@@ -45,10 +69,20 @@ const Index = () => {
         <Sidebar activeItem={activeMenuItem} onItemClick={handleMenuItemClick} />
         <main className="flex-1 overflow-y-auto">
           {activeMenuItem === "projects" && (
-            <ProjectsList 
-              projects={mockProjects}
-              onProjectClick={handleProjectClick}
-            />
+            <>
+              {loading && (
+                <div className="p-6 text-sm text-muted-foreground">Loading projects…</div>
+              )}
+              {!loading && error && (
+                <div className="p-6 text-sm text-red-600">{error}</div>
+              )}
+              {!loading && !error && (
+                <ProjectsList 
+                  projects={projects}
+                  onProjectClick={handleProjectClick}
+                />
+              )}
+            </>
           )}
           {activeMenuItem === "machines" && (
             <MachineSpecsTable />

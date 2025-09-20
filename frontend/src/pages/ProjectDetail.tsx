@@ -3,9 +3,9 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ProjectForm } from "@/components/projects/ProjectForm";
-import { mockProjects } from "@/data/mockData";
 import { Project } from "@/types/project";
 import { createNewProject } from "@/utils/projectUtils";
+import { apiGetProject, mapBackendProjectToFrontend, apiUpsertProject, mapFrontendProjectToBackend } from "@/lib/api";
 
 const ProjectDetail = () => {
   const { id } = useParams<{ id?: string }>();
@@ -17,15 +17,23 @@ const ProjectDetail = () => {
   const isNewProject = location.pathname === '/project/new';
 
   useEffect(() => {
-    if (isNewProject) {
-      // Create a new empty project
-      const newProject = createNewProject();
-      setProject(newProject);
-    } else if (id) {
-      // Load existing project
-      const foundProject = mockProjects.find(p => p.id === id);
-      setProject(foundProject || null);
-    }
+    let isMounted = true;
+    (async () => {
+      if (isNewProject) {
+        const newProject = createNewProject();
+        if (isMounted) setProject(newProject);
+      } else if (id) {
+        // Try to load from backend by project name (id is set to name in mapping)
+        try {
+          const resp = await apiGetProject(id);
+          if (!isMounted) return;
+          setProject(mapBackendProjectToFrontend(resp.project));
+        } catch (e) {
+          if (isMounted) setProject(null);
+        }
+      }
+    })();
+    return () => { isMounted = false; };
   }, [id, isNewProject]);
 
   const handleMenuItemClick = (item: string) => {
@@ -39,10 +47,15 @@ const ProjectDetail = () => {
     }
   };
 
-  const handleProjectUpdate = (updatedProject: Project) => {
+  const handleProjectUpdate = async (updatedProject: Project) => {
     setProject(updatedProject);
-    // TODO: In real app, this would save to backend
-    console.log("Updated project:", updatedProject);
+    try {
+      const payload = mapFrontendProjectToBackend(updatedProject);
+      await apiUpsertProject(payload);
+    } catch (e) {
+      // keep UI responsive; error can be handled with toast in future
+      console.error("Failed to save project to backend", e);
+    }
   };
 
   if (!project) {

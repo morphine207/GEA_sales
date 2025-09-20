@@ -189,13 +189,15 @@ async def calculate_project_tco(
         # Calculate TCO for each relevant machine
         tco_results = []
         for machine in relevant_machines:
+            # Derive training_cost from commissioning percentage of machine list price
+            training_cost = (machine.list_price or 0.0) * float(request.commissioning_pct)
+
             tco = calculate_tco_for_machine(
                 machine,
                 years=request.years,
                 electricity_eur_per_kwh=request.electricity_eur_per_kwh,
                 water_eur_per_l=request.water_eur_per_l,
-                commissioning_pct=request.commissioning_pct,
-                extra_maint_pct=request.extra_maint_pct,
+                training_cost=training_cost,
                 label=request.label,
                 operation_hours_per_year=request.operation_hours_per_year,
                 throughput_per_day=project.customer_throughput_per_day,
