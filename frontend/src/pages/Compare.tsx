@@ -16,6 +16,23 @@ type ChartSeries = {
   dataKey: string;
 };
 
+type SeriesItem = {
+  name: string;
+  monthly_cum_total: number[];
+  ca: number;
+  cc: number;
+  co: number;
+  cm: number;
+  capacityOk: boolean;
+};
+
+type DisplaySlot = {
+  name: string;
+  valid: boolean;
+  reason?: string;
+  data?: SeriesItem;
+};
+
 const currency = (n: number) =>
   new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
 
@@ -35,9 +52,9 @@ export default function Compare() {
   const initialThroughputRef = useRef<number>(0);
 
   // Data
-  const [series, setSeries] = useState<{ name: string; monthly_cum_total: number[]; ca: number; cc: number; co: number; cm: number }[]>([]);
+  const [series, setSeries] = useState<SeriesItem[]>([]);
   const [isFetching, setIsFetching] = useState(false);
-  const [displaySlots, setDisplaySlots] = useState<Array<{ name: string; valid: boolean; data?: { monthly_cum_total: number[]; ca: number; cc: number; co: number; cm: number } }>>([]);
+  const [displaySlots, setDisplaySlots] = useState<DisplaySlot[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -76,24 +93,29 @@ export default function Compare() {
         const machine = (resp.relevant_machines || [])[i] as any;
         const name = (machine?.langtyp || "").toString().trim() || r.label;
         const total = r.monthly_cum_total?.[r.monthly_cum_total.length - 1] ?? 0;
-        return { name, monthly_cum_total: r.monthly_cum_total, ca: r.ca, cc: r.cc, co: r.co, cm: r.cm, _total: total };
+        const maxPerHour = Number(machine?.capacity_max_inp) || 0;
+        const maxPerDay = maxPerHour * 20; // assume up to 20h/day of operation
+        const capacityOk = (throughputPerDay || 0) <= maxPerDay;
+        return { name, monthly_cum_total: r.monthly_cum_total, ca: r.ca, cc: r.cc, co: r.co, cm: r.cm, capacityOk, _total: total } as SeriesItem & { _total: number };
       });
-      const top3 = combined
+      const top3All = combined
         .sort((a, b) => a._total - b._total)
         .slice(0, 3)
-        .map(({ _total, ...rest }) => rest);
-      setSeries(top3);
+        .map(({ _total, ...rest }) => rest as SeriesItem);
+
+      const top3Valid = top3All.filter(s => s.capacityOk);
+      setSeries(top3Valid);
 
       // Update display slots: keep initial top3 as slots; on updates, gray out missing ones, don't auto-replace
-      const currentMap = new Map(top3.map(s => [s.name, s]));
+      const currentMap = new Map(top3All.map(s => [s.name, s]));
       setDisplaySlots(prev => {
         if (!prev.length) {
-          return top3.map(s => ({ name: s.name, valid: true, data: s })).slice(0, 3);
+          return top3All.map(s => ({ name: s.name, valid: s.capacityOk, reason: s.capacityOk ? undefined : "Capacity surpassed", data: s.capacityOk ? s : undefined })).slice(0, 3);
         }
         return prev.map(slot => {
           const s = currentMap.get(slot.name);
-          if (s) return { name: slot.name, valid: true, data: s };
-          return { ...slot, valid: false, data: undefined };
+          if (s) return { name: slot.name, valid: s.capacityOk, reason: s.capacityOk ? undefined : "Capacity surpassed", data: s.capacityOk ? s : undefined };
+          return { ...slot, valid: false, reason: "Not valid at current settings", data: undefined };
         });
       });
     } catch (e) {
@@ -224,7 +246,7 @@ export default function Compare() {
                   <Card key={`${slot.name}-${idx}`} className={`p-4 border-2 ${slot.valid ? "" : "opacity-50"}`} style={{ borderColor }}>
                     <div className="font-semibold mb-1">{slot.name}</div>
                     {!slot.valid && (
-                      <div className="text-xs text-muted-foreground mb-2">Not valid at current settings</div>
+                      <div className="text-xs text-muted-foreground mb-2">{slot.reason || "Not valid at current settings"}</div>
                     )}
                     {slot.valid && slot.data ? (
                       <>
