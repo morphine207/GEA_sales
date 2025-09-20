@@ -16,7 +16,7 @@ def get_fast_api_instance():
     
 app = get_fast_api_instance()
 
-# * only used for development mode
+# only used for development mode
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*" if config.env == 'development' else [config.frontend_url.split(",")]],
