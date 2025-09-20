@@ -6,9 +6,23 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { Line, LineChart, XAxis, YAxis, CartesianGrid } from "recharts";
+import { Line, LineChart, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, Tooltip as RechartsTooltip } from "recharts";
 import { apiCalculateProjectTCO, apiGetProject, mapBackendProjectToFrontend, TCOCalculationRequest } from "@/lib/api";
 import { Project } from "@/types/project";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { generateSalesInsights, SalesInsights } from "@/lib/llm";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Trophy, PiggyBank, Zap, TrendingDown, Sparkles } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type ChartSeries = {
   name: string;
@@ -38,6 +52,14 @@ export default function Compare() {
   const [series, setSeries] = useState<{ name: string; monthly_cum_total: number[]; ca: number; cc: number; co: number; cm: number }[]>([]);
   const [isFetching, setIsFetching] = useState(false);
   const [displaySlots, setDisplaySlots] = useState<Array<{ name: string; valid: boolean; data?: { monthly_cum_total: number[]; ca: number; cc: number; co: number; cm: number } }>>([]);
+
+  // LLM modal state
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [llmLoading, setLlmLoading] = useState(false);
+  const [llmError, setLlmError] = useState<string>("");
+  const DEFAULT_PROMPT = `You are a GEA Sales Assistant. Write a concise, plain-language summary for all stakeholders.\n\nRequirements:\n- Use short bullets (max 5 words), simple wording\n- Include a tiny comparison table\n- Highlight: best variant, total TCO, savings vs #2, operating cost share\n- Use a few emojis (💰⚡📉)\n- Max 200 words\n\nOutput in Markdown only.`;
+  const [prompt, setPrompt] = useState<string>(DEFAULT_PROMPT);
+  const [insights, setInsights] = useState<SalesInsights | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -148,6 +170,74 @@ export default function Compare() {
     else if (item === "tco-formula") navigate("/?section=tco-formula");
   };
 
+  const bestKpis = useMemo(() => {
+    if (!series.length) return null as null | {
+      name: string;
+      totals: { ca: number; cc: number; co: number; cm: number };
+      totalSum: number;
+      opSharePct: number;
+      savingsVsNext: number;
+    };
+    const enriched = series.map(s => ({
+      name: s.name,
+      totals: { ca: s.ca, cc: s.cc, co: s.co, cm: s.cm },
+      totalSum: s.ca + s.cc + s.co + s.cm,
+    }));
+    const sorted = [...enriched].sort((a, b) => a.totalSum - b.totalSum);
+    const best = sorted[0];
+    const next = sorted[1];
+    const opSharePct = best.totalSum > 0 ? Math.round((best.totals.co / best.totalSum) * 100) : 0;
+    const savingsVsNext = next ? Math.max(0, Math.round(next.totalSum - best.totalSum)) : 0;
+    return { name: best.name, totals: best.totals, totalSum: best.totalSum, opSharePct, savingsVsNext };
+  }, [series]);
+
+  const buildLlmPayload = () => {
+    const machines = displaySlots.map(s => ({
+      name: s.name,
+      valid: s.valid,
+      totals: s.data ? { ca: s.data.ca, cc: s.data.cc, co: s.data.co, cm: s.data.cm } : null,
+    }));
+    const tcoResults = series.map(s => ({
+      name: s.name,
+      totals: { ca: s.ca, cc: s.cc, co: s.co, cm: s.cm },
+      monthly_cum_total: s.monthly_cum_total,
+    }));
+    return {
+      project: project,
+      inputs: {
+        years,
+        throughput_per_day: throughputPerDay,
+        electricity_eur_per_kwh: electricityEurPerKwh,
+        water_eur_per_l: waterEurPerL,
+        workdays_per_week: project?.workdaysPerWeek,
+      },
+      tcoResults,
+      machines,
+    };
+  };
+
+  const regenerateSummary = async () => {
+    if (!project || !series.length) return;
+    setLlmLoading(true);
+    setLlmError("");
+    try {
+      const payload = buildLlmPayload();
+      const json = await generateSalesInsights({ prompt, data: payload });
+      setInsights(json);
+    } catch (e: any) {
+      setLlmError(e?.message || "Failed to generate summary");
+      setInsights(null);
+    } finally {
+      setLlmLoading(false);
+    }
+  };
+
+  const handleOpenAssistant = async () => {
+    setAssistantOpen(true);
+    // auto-generate on open
+    await regenerateSummary();
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header onNewProject={() => navigate("/project/new")} />
@@ -162,8 +252,17 @@ export default function Compare() {
               <span className="text-muted-foreground">/</span>
               <div className="font-semibold">Compare top 3 machines</div>
             </div>
-            <div className="text-sm text-muted-foreground">
-              {loading ? "Loading…" : error ? error : series.length ? `${series.length} variants` : "No results"}
+            <div className="flex items-center gap-2">
+              <div className="text-sm text-muted-foreground">
+                {loading ? "Loading…" : error ? error : series.length ? `${series.length} variants` : "No results"}
+              </div>
+              <Button
+                onClick={handleOpenAssistant}
+                disabled={loading || isFetching}
+                className="bg-gradient-to-r from-sky-600 via-cyan-500 to-emerald-500 text-white shadow-lg hover:from-sky-500 hover:via-cyan-400 hover:to-emerald-400 focus-visible:ring-2 focus-visible:ring-cyan-300"
+              >
+                <Sparkles className="w-4 h-4 mr-2" /> AI Sales Assistant
+              </Button>
             </div>
           </div>
 
@@ -246,6 +345,215 @@ export default function Compare() {
           )}
         </main>
       </div>
+
+      {/* Sales Assistant Modal */}
+      <Dialog open={assistantOpen} onOpenChange={setAssistantOpen}>
+        <DialogContent className="max-w-[80vw] sm:max-w-[1000px]">
+          <DialogHeader>
+            <DialogTitle>GEA Sales Assistant</DialogTitle>
+            <DialogDescription>AI-Powered Insights for Your TCO Comparison</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-4 max-h-[80vh] overflow-y-auto pr-1">
+            {bestKpis && (
+              <Card className="p-4">
+                <Tabs defaultValue="summary">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Trophy className="w-4 h-4 text-primary" />
+                      <div className="font-semibold">Top Pick</div>
+                      <Badge variant="secondary">{bestKpis.name}</Badge>
+                    </div>
+                    <TabsList>
+                      <TabsTrigger value="summary">Summary</TabsTrigger>
+                      <TabsTrigger value="table">Table</TabsTrigger>
+                      <TabsTrigger value="donut">Donut</TabsTrigger>
+                    </TabsList>
+                  </div>
+                  <TabsContent value="summary">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="rounded-md border p-3">
+                        <div className="text-xs text-muted-foreground flex items-center gap-1"><PiggyBank className="w-3 h-3" /> Total TCO</div>
+                        <div className="text-lg font-bold">{currency(bestKpis.totalSum)}</div>
+                      </div>
+                      <div className="rounded-md border p-3">
+                        <div className="text-xs text-muted-foreground flex items-center gap-1"><TrendingDown className="w-3 h-3" /> Savings vs #2</div>
+                        <div className="text-lg font-bold">{currency(bestKpis.savingsVsNext)}</div>
+                      </div>
+                      <div className="rounded-md border p-3">
+                        <div className="text-xs text-muted-foreground flex items-center gap-1"><Zap className="w-3 h-3" /> Operating cost share</div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="w-full"><Progress value={bestKpis.opSharePct} /></div>
+                          <div className="text-sm font-medium w-10 text-right">{bestKpis.opSharePct}%</div>
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="table">
+                    <div className="rounded-md border overflow-hidden">
+                      <table className="w-full">
+                        <thead className="bg-muted/50">
+                          <tr>
+                            <th className="text-xs font-semibold px-3 py-2 text-left">Component</th>
+                            <th className="text-xs font-semibold px-3 py-2 text-right">Amount</th>
+                            <th className="text-xs font-semibold px-3 py-2 text-right">Share</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {([
+                            ["Acquisition", bestKpis.totals.ca],
+                            ["Commissioning", bestKpis.totals.cc],
+                            ["Operating", bestKpis.totals.co],
+                            ["Maintenance", bestKpis.totals.cm],
+                          ] as const).map(([label, val]) => {
+                            const pct = bestKpis.totalSum ? Math.round((val / bestKpis.totalSum) * 100) : 0;
+                            return (
+                              <tr key={label}>
+                                <td className="px-3 py-2 text-sm">{label}</td>
+                                <td className="px-3 py-2 text-sm text-right">{currency(val)}</td>
+                                <td className="px-3 py-2 text-sm text-right">{pct}%</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="donut">
+                    {(() => {
+                      const data = [
+                        { name: "Acquisition", value: bestKpis.totals.ca, color: "#2563eb" },
+                        { name: "Commissioning", value: bestKpis.totals.cc, color: "#f59e0b" },
+                        { name: "Operating", value: bestKpis.totals.co, color: "#10b981" },
+                        { name: "Maintenance", value: bestKpis.totals.cm, color: "#ef4444" },
+                      ];
+                      const total = data.reduce((s, d) => s + d.value, 0);
+                      return (
+                        <div className="w-full flex flex-col sm:flex-row items-center justify-center gap-6">
+                          <PieChart width={280} height={220}>
+                            <Pie data={data} innerRadius={60} outerRadius={90} paddingAngle={2} dataKey="value">
+                              {data.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <RechartsTooltip formatter={(v) => currency(Number(v))} />
+                          </PieChart>
+                          <div className="grid grid-cols-2 sm:grid-cols-1 gap-2 min-w-[220px]">
+                            {data.map((d) => {
+                              const pct = total ? Math.round((d.value / total) * 100) : 0;
+                              return (
+                                <div key={d.name} className="flex items-center justify-between gap-3 rounded-md border px-2 py-1.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: d.color }} />
+                                    <span className="text-sm">{d.name}</span>
+                                  </div>
+                                  <div className="text-sm font-medium text-right">
+                                    <div>{currency(d.value)}</div>
+                                    <div className="text-xs text-muted-foreground">{pct}%</div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </TabsContent>
+                </Tabs>
+              </Card>
+            )}
+            <Card className="p-4 bg-gradient-to-br from-background to-primary/5">
+              {llmLoading ? (
+                <div className="text-sm text-muted-foreground">Generating summary…</div>
+              ) : (
+                insights ? (
+                  <div className="grid grid-cols-1 gap-4">
+                    {(insights.title || insights.subtitle) && (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          {insights.title && <div className="text-lg font-semibold">{insights.title}</div>}
+                          {insights.subtitle && <div className="text-sm text-muted-foreground">{insights.subtitle}</div>}
+                        </div>
+                        {insights.project && (
+                          <div className="text-xs text-muted-foreground text-right">
+                            {insights.project.company && <div>{insights.project.company}</div>}
+                            {insights.project.application && <div>{insights.project.application}</div>}
+                            {typeof insights.project.durationYears === 'number' && <div>{insights.project.durationYears} years</div>}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {insights.metrics && (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="rounded-md border p-3">
+                          <div className="text-xs text-muted-foreground">Total TCO</div>
+                          <div className="text-lg font-bold">{currency(insights.metrics.totalTcoEur)}</div>
+                        </div>
+                        <div className="rounded-md border p-3">
+                          <div className="text-xs text-muted-foreground">Savings vs #2</div>
+                          <div className="text-lg font-bold">{currency(insights.metrics.savingsVsSecondEur)}</div>
+                        </div>
+                        <div className="rounded-md border p-3">
+                          <div className="text-xs text-muted-foreground">Operating share</div>
+                          <div className="text-lg font-bold">{insights.metrics.operatingSharePct}%</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {Array.isArray(insights.comparison) && insights.comparison.length > 0 && (
+                      <div className="rounded-md border overflow-hidden">
+                        <table className="w-full">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="text-xs font-semibold px-3 py-2 text-left">Machine</th>
+                              <th className="text-xs font-semibold px-3 py-2 text-right">Total TCO</th>
+                              <th className="text-xs font-semibold px-3 py-2 text-right">Operating</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {insights.comparison.map((row, idx) => (
+                              <tr key={idx}>
+                                <td className="px-3 py-2 text-sm">{row.name}</td>
+                                <td className="px-3 py-2 text-sm text-right">{currency(row.totalTcoEur)}</td>
+                                <td className="px-3 py-2 text-sm text-right">{typeof row.operatingCostEur === 'number' ? currency(row.operatingCostEur) : '-'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {Array.isArray(insights.highlights) && insights.highlights.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {insights.highlights.map((h, i) => (
+                          <Badge key={i} variant="secondary">{h}</Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    {Array.isArray(insights.notes) && insights.notes.length > 0 && (
+                      <div className="rounded-md border p-3 bg-card">
+                        <div className="text-sm font-medium mb-2">Notes</div>
+                        <ul className="list-disc pl-4 text-sm text-muted-foreground">
+                          {insights.notes.map((n, i) => (<li key={i}>{n}</li>))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">No summary yet.</div>
+                )
+              )}
+              {llmError && <div className="mt-2 text-sm text-red-600">{llmError}</div>}
+            </Card>
+
+            {/* Prompt editor removed as requested */}
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setAssistantOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
