@@ -2,6 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Apply Inter font to app and enhance Markdown area */
+:root {
+  --font-sans: Inter, Manrope, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+.ai-summary { font-family: var(--font-sans); }
+.ai-summary, .ai-summary * { font-family: var(--font-sans); }
+.ai-summary h2, .ai-summary h3 { letter-spacing: -0.01em; }
+.ai-summary table { table-layout: auto; }
+.ai-summary th, .ai-summary td { vertical-align: middle; }
+.ai-summary ul { list-style: disc; padding-left: 1.125rem; }
+.ai-summary table th:nth-child(2),
+.ai-summary table td:nth-child(2),
+.ai-summary table th:nth-child(3),
+.ai-summary table td:nth-child(3) {
+  text-align: right;
+}
+/* Hard override to ensure fonts always apply */
+html, body, #root { font-family: var(--font-sans) !important; }
+.ai-summary .prose, .ai-summary .prose * { font-family: var(--font-sans) !important; }
+/* Align numeric glyph widths for better table alignment */
+.ai-summary { font-variant-numeric: tabular-nums; }
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */
@@ -99,7 +126,7 @@ All colors MUST be HSL.
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border font-sans;
   }
 
   body {
