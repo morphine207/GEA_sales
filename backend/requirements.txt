@@ -1,23 +1,13 @@
-annotated-types==0.7.0
-azure-ai-documentintelligence==1.0.0b4
-azure-cognitiveservices-vision-computervision==0.9.1
-azure-common==1.1.28
-azure-core==1.32.0
-azure-storage-blob==12.24.1
-networkx==3.4.2
-numpy==2.2.2
-opencv-contrib-python==4.11.0.86
-pillow==11.1.0
-scikit-learn==1.6.1
-scipy==1.15.1
-shapely==2.0.6
-pandas==2.2.3
+# Core FastAPI dependencies
 fastapi==0.115.8
 uvicorn==0.34.0
 pydantic==2.10.6
 python-multipart==0.0.20
 pydantic-settings==2.7.1
-PyMuPDF==1.25.2
-SQLAlchemy==2.0.38
-alembic==1.15.2
+
+# Calculation engine dependencies
+pandas==2.2.3
+numpy==2.2.2
+
+# Utilities
 termcolor==3.0.1

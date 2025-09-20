@@ -37,14 +37,18 @@ class MachineData:
     def calculate_toc(
         self,
         *,
-        operation_hours_per_year: float,
         years: int,
         electricity_eur_per_kwh: float,
         water_eur_per_l: float,
-        ejections_per_hour: float = 0.0,
         commissioning_pct: float = 0.10,
         extra_maint_pct: float = 0.00,
         label: Optional[str] = None,
+        # Operation hours approach
+        operation_hours_per_year: Optional[float] = None,
+        # Throughput approach
+        throughput_per_day: Optional[float] = None,
+        workdays_per_week: int = 5,
+        operation_hours_per_day: Optional[float] = None,
     ):
         """
         Build a TCO object using the same rules as your pandas simulator:
@@ -53,6 +57,14 @@ class MachineData:
         - Monthly operating cost Co from power and water
         - Service at the earlier of every 8000 hours OR 24 months
         - +€2000 per service for flat-belt drives
+        
+        Operation calculation:
+        - If operation_hours_per_year is provided, use it directly
+        - If throughput_per_day is provided, calculate hours based on capacity:
+          * Calculate required hours per day = throughput_per_day / capacity_max_inp
+          * Calculate hours per year = required_hours_per_day * workdays_per_week * 52
+        - If operation_hours_per_day is provided, use it for daily hours calculation
+        
         Returns: TCO(monthly_cum_total starting with month 0, and final ca/cc/co/cm)
         """
         # Handle imports for both module and direct execution
@@ -60,6 +72,33 @@ class MachineData:
             from .tco import TCO
         except ImportError:
             from tco import TCO
+        
+        # Calculate operation hours per year based on provided parameters
+        if operation_hours_per_year is not None:
+            # Use provided operation hours directly
+            hrs_per_year = operation_hours_per_year
+        elif throughput_per_day is not None:
+            # Calculate based on throughput and capacity
+            capacity_max = self.capacity_max_inp if not math.isnan(self.capacity_max_inp) else 0.0
+            if capacity_max <= 0:
+                raise ValueError(f"Invalid capacity_max_inp: {capacity_max}. Cannot calculate operation hours from throughput.")
+            
+            # Calculate required hours per day based on throughput
+            required_hours_per_day = throughput_per_day / capacity_max
+            
+            # If operation_hours_per_day is provided, use the minimum of required and available hours
+            if operation_hours_per_day is not None:
+                actual_hours_per_day = min(required_hours_per_day, operation_hours_per_day)
+            else:
+                actual_hours_per_day = required_hours_per_day
+            
+            # Calculate hours per year
+            hrs_per_year = actual_hours_per_day * workdays_per_week * 52
+        elif operation_hours_per_day is not None:
+            # Use daily hours directly
+            hrs_per_year = operation_hours_per_day * workdays_per_week * 52
+        else:
+            raise ValueError("Must provide either operation_hours_per_year, throughput_per_day, or operation_hours_per_day")
         
         # Label (fallback similar to make_label)
         if not label:
@@ -76,7 +115,7 @@ class MachineData:
             label = " – ".join(parts) if parts else "Machine"
 
         months = int(years) * 12
-        hrs_per_month = float(operation_hours_per_year) / 12.0
+        hrs_per_month = float(hrs_per_year) / 12.0
 
         power_kw   = 0.0 if (self.power_consumption_total_kw is None or math.isnan(self.power_consumption_total_kw)) else float(self.power_consumption_total_kw)
         water_lps  = 0.0 if (self.op_water_l_s is None or math.isnan(self.op_water_l_s)) else float(self.op_water_l_s)
@@ -114,10 +153,9 @@ class MachineData:
             # Operating costs this month
             energy_kwh = power_kw * hrs_per_month
             water_l_from_flow = water_lps * (hrs_per_month * 3600.0)
-            water_l_from_ej   = water_lpej * ejections_per_hour * hrs_per_month
 
             Co_month = (energy_kwh * float(electricity_eur_per_kwh)) + \
-                       ((water_l_from_flow + water_l_from_ej) * float(water_eur_per_l))
+                       (water_l_from_flow * float(water_eur_per_l))
             cum_Co += Co_month
 
             # Accumulate counters towards service

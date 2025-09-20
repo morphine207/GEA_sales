@@ -130,61 +130,75 @@ def load_machines_from_csv(path: str) -> List[MachineData]:
 
 def calculate_tco_for_machine(
     machine: MachineData,
-    operation_hours_per_year: float = 8000,
     years: int = 5,
     electricity_eur_per_kwh: float = 0.25,
     water_eur_per_l: float = 0.002,
-    ejections_per_hour: float = 2,
     commissioning_pct: float = 0.10,
     extra_maint_pct: float = 0.00,
-    label: Optional[str] = None
+    label: Optional[str] = None,
+    # Operation hours approach
+    operation_hours_per_year: Optional[float] = None,
+    # Throughput approach
+    throughput_per_day: Optional[float] = None,
+    workdays_per_week: int = 5,
+    operation_hours_per_day: Optional[float] = None,
 ) -> TCO:
     """
     Calculate TCO for a single machine with given parameters.
     
     Args:
         machine: MachineData object
-        operation_hours_per_year: Hours of operation per year
         years: Number of years for calculation
         electricity_eur_per_kwh: Electricity cost per kWh
         water_eur_per_l: Water cost per liter
-        ejections_per_hour: Number of ejections per hour
         commissioning_pct: Commissioning percentage of list price
         extra_maint_pct: Extra maintenance percentage of list price
         label: Custom label for the TCO calculation
+        operation_hours_per_year: Hours of operation per year (optional)
+        throughput_per_day: Daily throughput in capacity units (optional)
+        workdays_per_week: Number of workdays per week (1-7, default 5)
+        operation_hours_per_day: Available operation hours per day (optional)
         
     Returns:
         TCO object with calculated costs
     """
     return machine.calculate_toc(
-        operation_hours_per_year=operation_hours_per_year,
         years=years,
         electricity_eur_per_kwh=electricity_eur_per_kwh,
         water_eur_per_l=water_eur_per_l,
-        ejections_per_hour=ejections_per_hour,
         commissioning_pct=commissioning_pct,
         extra_maint_pct=extra_maint_pct,
-        label=label
+        label=label,
+        operation_hours_per_year=operation_hours_per_year,
+        throughput_per_day=throughput_per_day,
+        workdays_per_week=workdays_per_week,
+        operation_hours_per_day=operation_hours_per_day
     )
 
 def compare_machines(
     machines: List[MachineData],
-    operation_hours_per_year: float = 8000,
     years: int = 5,
     electricity_eur_per_kwh: float = 0.25,
     water_eur_per_l: float = 0.002,
-    ejections_per_hour: float = 2
+    # Operation hours approach
+    operation_hours_per_year: Optional[float] = None,
+    # Throughput approach
+    throughput_per_day: Optional[float] = None,
+    workdays_per_week: int = 5,
+    operation_hours_per_day: Optional[float] = None,
 ) -> List[TCO]:
     """
     Compare multiple machines by calculating TCO for each.
     
     Args:
         machines: List of MachineData objects
-        operation_hours_per_year: Hours of operation per year
         years: Number of years for calculation
         electricity_eur_per_kwh: Electricity cost per kWh
         water_eur_per_l: Water cost per liter
-        ejections_per_hour: Number of ejections per hour
+        operation_hours_per_year: Hours of operation per year (optional)
+        throughput_per_day: Daily throughput in capacity units (optional)
+        workdays_per_week: Number of workdays per week (1-7, default 5)
+        operation_hours_per_day: Available operation hours per day (optional)
         
     Returns:
         List of TCO objects sorted by total cost (ascending)
@@ -193,11 +207,13 @@ def compare_machines(
     for machine in machines:
         tco = calculate_tco_for_machine(
             machine,
-            operation_hours_per_year=operation_hours_per_year,
             years=years,
             electricity_eur_per_kwh=electricity_eur_per_kwh,
             water_eur_per_l=water_eur_per_l,
-            ejections_per_hour=ejections_per_hour
+            operation_hours_per_year=operation_hours_per_year,
+            throughput_per_day=throughput_per_day,
+            workdays_per_week=workdays_per_week,
+            operation_hours_per_day=operation_hours_per_day
         )
         tcos.append(tco)
     
@@ -214,6 +230,83 @@ def save_machines_to_json(machines: List[MachineData], filepath: str) -> None:
     """
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump([m.to_dict() for m in machines], f, ensure_ascii=False, indent=2)
+
+def filter_machines_for_project(machines: List[MachineData], project) -> List[MachineData]:
+    """
+    Filter machines based on project requirements.
+    
+    Filtering criteria:
+    1. Application matches (case-insensitive)
+    2. Sub-application matches (case-insensitive) 
+    3. Solids percentage is within machine's range
+    4. Throughput capacity can handle project requirements
+    5. Protection class matches or is higher
+    6. Motor efficiency matches or is higher
+    
+    Args:
+        machines: List of MachineData objects to filter
+        project: Project object with requirements
+        
+    Returns:
+        List of MachineData objects that match project requirements
+    """
+    relevant_machines = []
+    
+    for machine in machines:
+        # Check application match
+        if (project.application.lower() not in machine.application.lower() and 
+            machine.application.lower() not in project.application.lower()):
+            continue
+            
+        # Check sub-application match
+        if (project.sub_application.lower() not in machine.sub_application.lower() and
+            machine.sub_application.lower() not in project.sub_application.lower()):
+            continue
+        
+        # Check solids percentage is within machine's range
+        if (not (machine.feed_solids_min_vol_perc <= project.solids_percentage <= machine.feed_solids_max_vol_perc)):
+            continue
+        
+        # Check throughput capacity (machine should be able to handle project throughput)
+        if machine.capacity_max_inp < project.customer_throughput_per_day:
+            continue
+        
+        # Check protection class (machine should meet or exceed project requirements)
+        if not _protection_class_meets_requirement(machine.protection_class, project.protection_class):
+            continue
+        
+        # Check motor efficiency (machine should meet or exceed project requirements)
+        if not _motor_efficiency_meets_requirement(machine.motor_efficiency, project.motor_efficiency):
+            continue
+        
+        relevant_machines.append(machine)
+    
+    return relevant_machines
+
+def _protection_class_meets_requirement(machine_class: str, project_class: str) -> bool:
+    """Check if machine protection class meets project requirements."""
+    if not machine_class or not project_class:
+        return True  # If either is missing, assume it's acceptable
+    
+    # Simple string comparison for now - could be enhanced with proper IP rating logic
+    return machine_class.lower() >= project_class.lower()
+
+def _motor_efficiency_meets_requirement(machine_efficiency: Optional[str], project_efficiency: Optional[str]) -> bool:
+    """Check if machine motor efficiency meets project requirements."""
+    if not project_efficiency:
+        return True  # If project has no requirement, any machine is acceptable
+    
+    if not machine_efficiency:
+        return False  # If machine has no efficiency rating, it doesn't meet requirements
+    
+    # Simple string comparison for efficiency classes
+    efficiency_order = ["ie1", "ie2", "ie3", "ie4", "ie5"]
+    try:
+        machine_ie = next(i for i, eff in enumerate(efficiency_order) if eff in machine_efficiency.lower())
+        project_ie = next(i for i, eff in enumerate(efficiency_order) if eff in project_efficiency.lower())
+        return machine_ie >= project_ie
+    except StopIteration:
+        return True  # If we can't parse the efficiency, assume it's acceptable
 
 # --- Example usage ---
 if __name__ == "__main__":
@@ -247,10 +340,12 @@ if __name__ == "__main__":
     print("   - Duration: 5 years")
     print("   - Electricity: €0.25/kWh")
     print("   - Water: €0.002/L")
-    print("   - Ejections: 2/hour")
     
-    # Calculate TCO for first machine
-    tco = calculate_tco_for_machine(machines[0])
+    # Calculate TCO for first machine using operation hours
+    tco = calculate_tco_for_machine(
+        machines[0],
+        operation_hours_per_year=8000
+    )
     
     print(f"\n📊 TCO Results for '{tco.label}':")
     print(f"   Acquisition Cost (Ca): €{tco.ca:,.2f}")
@@ -268,7 +363,10 @@ if __name__ == "__main__":
     
     # Compare multiple machines
     print(f"\n🔍 Comparing first 3 machines:")
-    comparison_tcos = compare_machines(machines[:3])
+    comparison_tcos = compare_machines(
+        machines[:3],
+        operation_hours_per_year=8000
+    )
     for i, tco in enumerate(comparison_tcos):
         print(f"   {i+1}. {tco.label}: €{tco.total:,.2f}")
     
@@ -276,6 +374,26 @@ if __name__ == "__main__":
     if comparison_tcos:
         best_value = comparison_tcos[0]  # Already sorted by total cost
         print(f"\n🏆 Best Value: {best_value.label} at €{best_value.total:,.2f}")
+    
+    # Example throughput-based calculation
+    print(f"\n🔄 Throughput-Based Calculation Example:")
+    print("   Parameters:")
+    print("   - Throughput: 1000 units/day")
+    print("   - Workdays: 5 days/week")
+    print("   - Max operation: 12 hours/day")
+    print("   - Duration: 5 years")
+    
+    if machines:
+        throughput_tco = calculate_tco_for_machine(
+            machines[0],
+            throughput_per_day=1000,
+            workdays_per_week=5,
+            operation_hours_per_day=12
+        )
+        
+        print(f"\n📊 Throughput TCO Results for '{throughput_tco.label}':")
+        print(f"   Total Cost of Ownership: €{throughput_tco.total:,.2f}")
+        print(f"   (Based on {1000} units/day throughput)")
     
     # Save results to JSON
     try:

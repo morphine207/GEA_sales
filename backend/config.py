@@ -1,22 +1,18 @@
 import os
-from pydantic_settings import BaseSettings, SettingsConfigDict 
+from typing import List
 
-DOTENV = os.path.join(os.path.dirname(__file__), ".env")
+class Config:
+    def __init__(self):
+        self.env = os.getenv("ENVIRONMENT", "development")
+        self.port = int(os.getenv("PORT", "8000"))
+        self.frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        self.debug = self.env == "development"
+        
+    @property
+    def cors_origins(self) -> List[str]:
+        if self.env == "development":
+            return ["*"]
+        else:
+            return [url.strip() for url in self.frontend_url.split(",")]
 
-class Settings(BaseSettings):
-    db_name: str
-    upload_path: str
-    azure_di_endpoint: str
-    azure_di_key: str
-    env: str = 'development'
-    port: int = 8000
-    frontend_url: str = "http://127.0.0.1:80"
-
-    model_config = SettingsConfigDict(
-        env_file=DOTENV,
-        env_file_encoding="utf-8",
-        env_ignore_empty=True,
-        populate_by_name=True
-    )
-
-config = Settings()
+config = Config()
