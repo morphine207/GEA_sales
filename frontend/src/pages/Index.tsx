@@ -5,7 +5,8 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { ProjectsList } from "@/components/projects/ProjectsList";
 import { MachineSpecsTable } from "@/components/machines/MachineSpecsTable";
 import { Project } from "@/types/project";
-import { apiListProjects, mapBackendProjectToFrontend, apiCalculateProjectTCO } from "@/lib/api";
+import { apiListProjects, mapBackendProjectToFrontend, apiCalculateProjectTCO, apiUpsertProject, mapFrontendProjectToBackend } from "@/lib/api";
+import { createNewProject } from "@/utils/projectUtils";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -72,9 +73,25 @@ const Index = () => {
     return () => { isMounted = false; };
   }, []);
 
-  const handleNewProject = () => {
-    // Navigate to the new project route
-    navigate('/project/new');
+  const handleNewProject = async () => {
+    try {
+      // Create a new project with default values
+      const newProject = createNewProject();
+      
+      // Save it to the backend immediately
+      const backendProject = mapFrontendProjectToBackend(newProject);
+      await apiUpsertProject(backendProject);
+      
+      // Add it to the local projects list
+      setProjects(prev => [newProject, ...prev]);
+      
+      // Navigate to the new project using its project name as ID
+      navigate(`/project/${newProject.projectName}`);
+    } catch (error) {
+      console.error("Failed to create new project:", error);
+      // Fallback to the old behavior if backend save fails
+      navigate('/project/new');
+    }
   };
 
   const handleProjectClick = (project: Project) => {

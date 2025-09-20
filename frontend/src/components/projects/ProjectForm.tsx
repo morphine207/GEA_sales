@@ -6,21 +6,89 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { apiCalculateProjectTCO } from "@/lib/api";
+import { apiMagicFill } from "@/lib/api";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Wand2, Check, X } from "lucide-react";
 
 interface ProjectFormProps {
   project: Project;
   onUpdate: (project: Project) => void;
-  isNewProject?: boolean;
 }
 
-export function ProjectForm({ project, onUpdate, isNewProject = false }: ProjectFormProps) {
+export function ProjectForm({ project, onUpdate }: ProjectFormProps) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<Project>(project);
-  const [hasCalculated, setHasCalculated] = useState(!isNewProject);
+  const [hasCalculated, setHasCalculated] = useState(true);
   const [tcoResults, setTcoResults] = useState<Array<{ label: string; ca: number; cc: number; co: number; cm: number; total: number }>>([]);
   const [isCalculating, setIsCalculating] = useState(false);
   const [calcError, setCalcError] = useState("");
   const tcoResultsRef = useRef<HTMLDivElement | null>(null);
+
+  // Title editing state
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(formData.projectName);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync edited title when project changes
+  useEffect(() => {
+    if (!isEditingTitle) {
+      setEditedTitle(formData.projectName);
+    }
+  }, [formData.projectName, isEditingTitle]);
+
+  // Magic Fill state
+  const [magicOpen, setMagicOpen] = useState(false);
+  const [magicText, setMagicText] = useState("");
+  const [isFilling, setIsFilling] = useState(false);
+  const [magicError, setMagicError] = useState("");
+
+  const mergeParsedIntoForm = (parsed: Partial<Project>) => {
+    const updated: Project = {
+      ...formData,
+      ...parsed,
+    } as Project;
+    setFormData(updated);
+    onUpdate(updated);
+  };
+
+  const handleMagicFill = async () => {
+    if (!formData.projectName || !magicText.trim()) return;
+    try {
+      setIsFilling(true);
+      setMagicError("");
+      const resp = await apiMagicFill(formData.projectName, magicText);
+      // Map backend keys to frontend Project shape
+      const p = resp.parsed as any;
+      const patch: Partial<Project> = {
+        company: p?.company_name ?? formData.company,
+        contact: p?.contact_person ?? formData.contact,
+        telephone: p?.telefon_nummer ?? formData.telephone,
+        mail: p?.email ?? formData.mail,
+        application: p?.application ?? formData.application,
+        subApplication: p?.sub_application ?? formData.subApplication,
+        feedSolid: (p?.solids_percentage != null && !Number.isNaN(p.solids_percentage)) ? String(p.solids_percentage) : formData.feedSolid,
+        capacityPerDay: (p?.customer_throughput_per_day != null) ? Number(p.customer_throughput_per_day) : formData.capacityPerDay,
+        years: (p?.years != null) ? Number(p.years) : formData.years,
+        workdaysPerWeek: (p?.workdays_per_week != null) ? Number(p.workdays_per_week) : formData.workdaysPerWeek,
+        energyPriceEurPerKwh: (p?.energy_price_eur_per_kwh != null) ? Number(p.energy_price_eur_per_kwh) : formData.energyPriceEurPerKwh,
+        waterPriceEurPerL: (p?.water_price_eur_per_l != null) ? Number(p.water_price_eur_per_l) : formData.waterPriceEurPerL,
+        protectionClass: p?.protection_class ?? formData.protectionClass,
+        motorEfficiency: p?.motor_efficiency ?? formData.motorEfficiency,
+        maxWidth: (p?.width_mm != null) ? Number(p.width_mm) : formData.maxWidth,
+        maxLength: (p?.length_mm != null) ? Number(p.length_mm) : formData.maxLength,
+        maxHeight: (p?.height_mm != null) ? Number(p.height_mm) : formData.maxHeight,
+        maxWeight: (p?.weight_kg != null) ? Number(p.weight_kg) : formData.maxWeight,
+      };
+      mergeParsedIntoForm(patch);
+      setMagicOpen(false);
+      setMagicText("");
+    } catch (e: any) {
+      setMagicError(e?.message || "Magic Fill failed");
+    } finally {
+      setIsFilling(false);
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('de-DE', {
@@ -76,11 +144,38 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
     }
   };
 
+  const handleTitleClick = () => {
+    setIsEditingTitle(true);
+    setEditedTitle(formData.projectName);
+    setTimeout(() => titleInputRef.current?.focus(), 0);
+  };
+
+  const handleTitleConfirm = async () => {
+    if (editedTitle.trim() && editedTitle !== formData.projectName) {
+      const updatedProject = { ...formData, projectName: editedTitle.trim() };
+      setFormData(updatedProject);
+      await onUpdate(updatedProject);
+    }
+    setIsEditingTitle(false);
+  };
+
+  const handleTitleCancel = () => {
+    setEditedTitle(formData.projectName);
+    setIsEditingTitle(false);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleTitleConfirm();
+    } else if (e.key === 'Escape') {
+      handleTitleCancel();
+    }
+  };
+
   // Auto-calc on mount for existing projects
   useEffect(() => {
     let isMounted = true;
     (async () => {
-      if (isNewProject) return;
       try {
         setIsCalculating(true);
         setCalcError("");
@@ -113,27 +208,83 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
     })();
     return () => { isMounted = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isNewProject, formData.projectName]);
+  }, [formData.projectName]);
 
   return (
     <div className="p-3 space-y-3 md:p-5 md:space-y-5">
-      {/* Header */}
+      {/* Editable Title Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button 
-            variant="ghost" 
-            onClick={() => navigate('/')}
-            className="text-primary hover:text-primary/80"
-          >
-            PROJECTS
-          </Button>
-          <span className="text-muted-foreground">/</span>
-          <Input
-            value={formData.projectName}
-            onChange={(e) => handleFieldChange('projectName', e.target.value)}
-            className="text-lg font-semibold bg-transparent border-none p-0 h-auto focus-visible:ring-0"
-            style={{ width: `${formData.projectName.length + 1}ch` }}
-          />
+        <div className="flex items-center space-x-2">
+          {isEditingTitle ? (
+            <div className="flex items-center space-x-2">
+              <Input
+                ref={titleInputRef}
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                onKeyDown={handleTitleKeyDown}
+                className="text-3xl font-bold text-primary bg-transparent border-none p-0 h-auto focus-visible:ring-0"
+                style={{ width: `${Math.max(editedTitle.length, 10)}ch` }}
+              />
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={handleTitleConfirm}
+                className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+              >
+                <Check className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={handleTitleCancel}
+                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <h1 
+              onClick={handleTitleClick}
+              className="text-3xl font-bold text-primary cursor-pointer hover:text-primary/80 transition-colors"
+            >
+              {formData.projectName}
+            </h1>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Dialog open={magicOpen} onOpenChange={setMagicOpen}>
+            <DialogTrigger asChild>
+              <Button variant="default" className="gap-2">
+                <Wand2 className="h-4 w-4" />
+                Magic Fill
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Magic Fill</DialogTitle>
+                <DialogDescription>
+                  Paste email threads or notes. The assistant will extract project details.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2">
+                <Textarea
+                  rows={14}
+                  value={magicText}
+                  onChange={(e) => setMagicText(e.target.value)}
+                  placeholder="Paste text here..."
+                />
+                {magicError && (
+                  <div className="text-sm text-red-600">{magicError}</div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setMagicOpen(false)}>Cancel</Button>
+                <Button onClick={handleMagicFill} disabled={!formData.projectName || !magicText.trim() || isFilling}>
+                  {isFilling ? 'Filling…' : 'Fill In'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 

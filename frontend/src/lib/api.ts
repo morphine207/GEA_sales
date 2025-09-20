@@ -143,6 +143,20 @@ export function apiListMachines() {
   return http<MachinesListResponse>(`/api/calculation/machines`);
 }
 
+// Magic Fill API
+export interface MagicFillResponse {
+  success: boolean;
+  parsed: Partial<BackendProject>;
+  message?: string;
+}
+
+export function apiMagicFill(projectName: string, text: string) {
+  return http<MagicFillResponse>(`/api/calculation/projects/${encodeURIComponent(projectName)}/magic-fill`, {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+}
+
 export function mapFrontendProjectToBackend(p: Project): BackendProject {
   return {
     project_name: p.projectName,

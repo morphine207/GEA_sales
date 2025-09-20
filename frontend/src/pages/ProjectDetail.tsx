@@ -4,7 +4,6 @@ import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ProjectForm } from "@/components/projects/ProjectForm";
 import { Project } from "@/types/project";
-import { createNewProject } from "@/utils/projectUtils";
 import { apiGetProject, mapBackendProjectToFrontend, apiUpsertProject, mapFrontendProjectToBackend } from "@/lib/api";
 
 const ProjectDetail = () => {
@@ -14,15 +13,10 @@ const ProjectDetail = () => {
   const [activeMenuItem, setActiveMenuItem] = useState("projects");
   const [project, setProject] = useState<Project | null>(null);
 
-  const isNewProject = location.pathname === '/project/new';
-
   useEffect(() => {
     let isMounted = true;
     (async () => {
-      if (isNewProject) {
-        const newProject = createNewProject();
-        if (isMounted) setProject(newProject);
-      } else if (id) {
+      if (id) {
         // Try to load from backend by project name (id is set to name in mapping)
         try {
           const resp = await apiGetProject(id);
@@ -34,7 +28,7 @@ const ProjectDetail = () => {
       }
     })();
     return () => { isMounted = false; };
-  }, [id, isNewProject]);
+  }, [id]);
 
   const handleMenuItemClick = (item: string) => {
     setActiveMenuItem(item);
@@ -84,7 +78,6 @@ const ProjectDetail = () => {
           <ProjectForm 
             project={project}
             onUpdate={handleProjectUpdate}
-            isNewProject={isNewProject}
           />
         </main>
       </div>
