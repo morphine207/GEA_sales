@@ -95,6 +95,10 @@ class MachineData:
         # OPERATION HOURS CALCULATION
         # ============================================================================
         
+        # Track capacity-related hours for UI/telemetry
+        needed_hours_per_day: Optional[float] = None
+        available_hours_per_day: Optional[float] = None
+
         if operation_hours_per_year is not None:
             # Use provided operation hours directly
             hrs_per_year = operation_hours_per_year
@@ -106,10 +110,12 @@ class MachineData:
             
             # Calculate required hours per day based on throughput
             required_hours_per_day = throughput_per_day / capacity_max
+            needed_hours_per_day = required_hours_per_day
             
             # If operation_hours_per_day is provided, use the minimum of required and available hours
             if operation_hours_per_day is not None:
                 actual_hours_per_day = min(required_hours_per_day, operation_hours_per_day)
+                available_hours_per_day = float(operation_hours_per_day)
             else:
                 actual_hours_per_day = required_hours_per_day
             
@@ -118,6 +124,7 @@ class MachineData:
         elif operation_hours_per_day is not None:
             # Use daily hours directly
             hrs_per_year = operation_hours_per_day * workdays_per_week * 52
+            available_hours_per_day = float(operation_hours_per_day)
         else:
             raise ValueError("Must provide either operation_hours_per_year, throughput_per_day, or operation_hours_per_day")
         
@@ -301,6 +308,9 @@ class MachineData:
             cc=cum_Cc,
             co=cum_Co,
             cm=cum_Cm,
+            needed_hours_per_day=needed_hours_per_day,
+            available_hours_per_day=available_hours_per_day,
+            hours_per_year=float(hrs_per_year),
         )
 
     def service_price_from_dmr(self, dmr_mm: float) -> float:

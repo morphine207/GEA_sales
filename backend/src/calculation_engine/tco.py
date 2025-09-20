@@ -15,6 +15,10 @@ class TCO:
     cc: float                           # commissioning
     co: float                           # operating
     cm: float                           # maintenance/services
+    # Optional telemetry for capacity/operation hours visibility
+    needed_hours_per_day: float | None = None
+    available_hours_per_day: float | None = None
+    hours_per_year: float | None = None
 
     @property
     def total(self) -> float:

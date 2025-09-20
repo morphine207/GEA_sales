@@ -61,6 +61,9 @@ export interface ProjectTCOResponse {
     cc: number;
     co: number;
     cm: number;
+    needed_hours_per_day?: number | null;
+    available_hours_per_day?: number | null;
+    hours_per_year?: number | null;
   }>;
   message: string;
 }

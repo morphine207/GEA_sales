@@ -38,6 +38,8 @@ type SeriesItem = {
   co: number;
   cm: number;
   capacityOk: boolean;
+  needed_hours_per_day?: number | null;
+  available_hours_per_day?: number | null;
 };
 
 type DisplaySlot = {
@@ -45,6 +47,7 @@ type DisplaySlot = {
   valid: boolean;
   reason?: string;
   data?: SeriesItem;
+  color: string;
 };
 
 const currency = (n: number) =>
@@ -78,6 +81,9 @@ export default function Compare() {
   const DEFAULT_PROMPT = `You are a GEA Sales Assistant. Write a concise, plain-language summary for all stakeholders.\n\nRequirements:\n- Use short bullets (max 5 words), simple wording\n- Include a tiny comparison table\n- Highlight: best variant, total TCO, savings vs #2, operating cost share\n- Use a few emojis (💰⚡📉)\n- Max 200 words\n\nOutput in Markdown only.`;
   const [prompt, setPrompt] = useState<string>(DEFAULT_PROMPT);
   const [insights, setInsights] = useState<SalesInsights | null>(null);
+
+  // Stable color palette for slots #1, #2, #3
+  const slotColors = ["#2563eb", "#f59e0b", "#10b981"] as const;
 
   useEffect(() => {
     (async () => {
@@ -120,7 +126,18 @@ export default function Compare() {
         const maxPerHour = Number(machine?.capacity_max_inp) || 0;
         const maxPerDay = maxPerHour * (operationHoursPerDay || 20);
         const capacityOk = (throughputPerDay || 0) <= maxPerDay;
-        return { name, monthly_cum_total: r.monthly_cum_total, ca: r.ca, cc: r.cc, co: r.co, cm: r.cm, capacityOk, _total: total } as SeriesItem & { _total: number };
+        return {
+          name,
+          monthly_cum_total: r.monthly_cum_total,
+          ca: r.ca,
+          cc: r.cc,
+          co: r.co,
+          cm: r.cm,
+          capacityOk,
+          needed_hours_per_day: r.needed_hours_per_day,
+          available_hours_per_day: r.available_hours_per_day,
+          _total: total,
+        } as SeriesItem & { _total: number };
       });
       const top3All = combined
         .sort((a, b) => a._total - b._total)
@@ -134,11 +151,17 @@ export default function Compare() {
       const currentMap = new Map(top3All.map(s => [s.name, s]));
       setDisplaySlots(prev => {
         if (!prev.length) {
-          return top3All.map(s => ({ name: s.name, valid: s.capacityOk, reason: s.capacityOk ? undefined : `Capacity surpassed at ${operationHoursPerDay} h/day`, data: s.capacityOk ? s : undefined })).slice(0, 3);
+          return top3All.map((s, idx) => ({
+            name: s.name,
+            valid: s.capacityOk,
+            reason: s.capacityOk ? undefined : `Capacity surpassed at ${operationHoursPerDay} h/day`,
+            data: s.capacityOk ? s : undefined,
+            color: slotColors[idx] || "#9ca3af",
+          })).slice(0, 3);
         }
         return prev.map(slot => {
           const s = currentMap.get(slot.name);
-          if (s) return { name: slot.name, valid: s.capacityOk, reason: s.capacityOk ? undefined : `Capacity surpassed at ${operationHoursPerDay} h/day`, data: s.capacityOk ? s : undefined };
+          if (s) return { name: slot.name, color: slot.color, valid: s.capacityOk, reason: s.capacityOk ? undefined : `Capacity surpassed at ${operationHoursPerDay} h/day`, data: s.capacityOk ? s : undefined };
           return { ...slot, valid: false, reason: "Not valid at current settings", data: undefined };
         });
       });
@@ -170,14 +193,19 @@ export default function Compare() {
     return rows;
   }, [series]);
 
-  const chartConfig = useMemo(
-    () => ({
-      s1: { label: series[0]?.name || "#1", color: "#2563eb" },
-      s2: { label: series[1]?.name || "#2", color: "#f59e0b" },
-      s3: { label: series[2]?.name || "#3", color: "#10b981" },
-    }),
-    [series],
-  );
+  const chartConfig = useMemo(() => {
+    const colorFor = (idx: number): string => {
+      const name = series[idx]?.name;
+      if (!name) return slotColors[idx] || "#9ca3af";
+      const slot = displaySlots.find(ds => ds.name === name);
+      return slot?.color || (slotColors[idx] || "#9ca3af");
+    };
+    return {
+      s1: { label: series[0]?.name || "#1", color: colorFor(0) },
+      s2: { label: series[1]?.name || "#2", color: colorFor(1) },
+      s3: { label: series[2]?.name || "#3", color: colorFor(2) },
+    } as const;
+  }, [series, displaySlots]);
 
   const lines: ChartSeries[] = useMemo(() => {
     const arr: ChartSeries[] = [];
@@ -346,8 +374,7 @@ export default function Compare() {
           {displaySlots.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {displaySlots.map((slot, idx) => {
-                const si = series.findIndex(s => s.name === slot.name);
-                const borderColor = si === 0 ? chartConfig.s1.color : si === 1 ? chartConfig.s2.color : si === 2 ? chartConfig.s3.color : "#9ca3af";
+                const borderColor = slot.color;
                 const total = slot.data ? (slot.data.monthly_cum_total?.[slot.data.monthly_cum_total.length - 1] ?? 0) : 0;
                 return (
                   <Card key={`${slot.name}-${idx}`} className={`p-4 border-2 ${slot.valid ? "" : "opacity-50"}`} style={{ borderColor }}>
@@ -358,6 +385,31 @@ export default function Compare() {
                     {slot.valid && slot.data ? (
                       <>
                         <div className="text-sm text-muted-foreground mb-3">Total: <span className="font-semibold text-foreground">{currency(total)}</span></div>
+                        {typeof slot.data.needed_hours_per_day === 'number' && typeof slot.data.available_hours_per_day === 'number' && (
+                          <div className="mb-3">
+                            {(() => {
+                              const needed = Math.max(0, slot.data.needed_hours_per_day || 0);
+                              const available = Math.max(0, slot.data.available_hours_per_day || 0);
+                              const pct = available > 0 ? Math.min(100, Math.round((needed / available) * 100)) : 0;
+                              // Determine gradient color: green → yellow @60% → red @90%+
+                              const grad = (() => {
+                                if (pct >= 90) return "bg-red-500";
+                                if (pct >= 60) return "bg-yellow-500";
+                                return "bg-emerald-500";
+                              })();
+                              return (
+                                <div>
+                                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                                    <span>Capacity utilization</span>
+                                    <span>{pct}%</span>
+                                  </div>
+                                  <Progress value={pct} indicatorClassName={grad} />
+                                  <div className="text-[10px] text-muted-foreground mt-1">Needed {needed.toFixed(1)} h/day of {available.toFixed(1)} h/day</div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
                         <div className="space-y-2 text-sm">
                           <div className="flex items-center justify-between"><span>Acquisition</span><span>{currency(slot.data.ca)}</span></div>
                           <div className="flex items-center justify-between"><span>Commissioning</span><span>{currency(slot.data.cc)}</span></div>
