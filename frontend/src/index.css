@@ -1,98 +1,108 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
 
-@import 'tailwindcss/base';
-@import 'tailwindcss/components';
-@import 'tailwindcss/utilities';
+@layer base {
+  :root {
+    /* GEA TCO Calculation Engine Design System */
+    --background: 0 0% 96%;
+    --foreground: 0 0% 15%;
 
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 15%;
 
-@font-face {
-  font-family: 'Satoshi';
-  src: local('Satoshi'), url('./assets/fonts/Satoshi-Variable.ttf');
-  font-feature-settings: 'zero';
-}
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 15%;
 
-:root {
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+    /* GEA Blue Primary */
+    --primary: 241 100% 50%;
+    --primary-foreground: 0 0% 100%;
 
-  --sidebar-width: 16rem;
-  --navigation-height: 56px;
-  --backgorund: #f3f4f6;
-  --backgorund: #f8f8f8;
-  --container-color: #fff;
-  --nav-width: 240px;
-  --nav-bg-dark: #0026B7;
-}
+    /* Light gray surfaces */
+    --secondary: 0 0% 90%;
+    --secondary-foreground: 0 0% 15%;
 
-/* Custom utility classes for better zero/O distinction */
-@layer utilities {
-  .font-feature-zero {
-    font-feature-settings: 'zero' on;
+    --muted: 0 0% 88%;
+    --muted-foreground: 0 0% 40%;
+
+    --accent: 0 0% 88%;
+    --accent-foreground: 0 0% 15%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 85%;
+    --input: 0 0% 100%;
+    --ring: 241 100% 50%;
+
+    --radius: 0.25rem;
+
+    /* Sidebar styling */
+    --sidebar-background: 0 0% 88%;
+    --sidebar-foreground: 0 0% 15%;
+    --sidebar-primary: 241 100% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 82%;
+    --sidebar-accent-foreground: 0 0% 15%;
+    --sidebar-border: 0 0% 80%;
+    --sidebar-ring: 241 100% 50%;
+
+    /* Custom GEA tokens */
+    --gea-blue: 241 100% 50%;
+    --gea-light-gray: 0 0% 88%;
+    --gea-medium-gray: 0 0% 80%;
+    --gea-dark-gray: 0 0% 15%;
   }
-  
-  .slashed-zero {
-    font-variant-numeric: slashed-zero tabular-nums;
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
 
-.nav-sidbar-dark {
-  background-color: var(--nav-bg-dark);
-  width: var(--nav-width)
-}
-
-html {
-  margin: 0;
-  padding: 0;
-  scroll-behavior: smooth;
-}
-
-body {
-  margin: 0;
-  padding: 0;
-  font-family: 'Inter', sans-serif;
-}
-
-.sidebar-width {
-  width: var(--sidebar-width);
-}
-
-.sidebar-margin-top{
-  margin-top: var(--navigation-height);
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateY(-100%);
-    opacity: 0;
+@layer base {
+  * {
+    @apply border-border;
   }
-  to {
-    transform: translateY(0);
-    opacity: 1;
+
+  body {
+    @apply bg-background text-foreground;
   }
-}
-
-.slidein-text {
-  animation: slideIn 0.5s forwards;
-}
-
-@keyframes revealText {
-  from {
-    height: 0;
-  }
-  to {
-    height: auto;
-    max-height: 10000px;
-  }
-}
-
-.revealed-text {
-  overflow: hidden;
-  animation: revealText 0.5s forwards;
-}
-
-.revealed-text.open {
-  height: auto;
 }

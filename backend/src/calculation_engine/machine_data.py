@@ -38,10 +38,12 @@ class MachineData:
         self,
         *,
         years: int,
-        electricity_eur_per_kwh: float,
-        water_eur_per_l: float,
-        commissioning_pct: float = 0.10,
-        extra_maint_pct: float = 0.00,
+        electricity_eur_per_kwh: float = 0.156,
+        water_eur_per_l: float = 0.0016,
+        training_cost: float = 0.0,
+        construction_cost_per_kg: float = 5.0,
+        cost_cleaning_eur_per_lit: float = 0.5,
+        unplanned_downtime: float = 0.02,
         label: Optional[str] = None,
         # Operation hours approach
         operation_hours_per_year: Optional[float] = None,
@@ -51,21 +53,37 @@ class MachineData:
         operation_hours_per_day: Optional[float] = None,
     ):
         """
-        Build a TCO object using the same rules as your pandas simulator:
-        - Upfront at month 0: Ca = Listprice, Cc = Listprice * commissioning_pct,
-          Cm starts at (Listprice * extra_maint_pct)
-        - Monthly operating cost Co from power and water
-        - Service at the earlier of every 8000 hours OR 24 months
-        - +€2000 per service for flat-belt drives
+        Calculate Total Cost of Ownership (TCO) for the machine over specified years.
         
-        Operation calculation:
-        - If operation_hours_per_year is provided, use it directly
-        - If throughput_per_day is provided, calculate hours based on capacity:
-          * Calculate required hours per day = throughput_per_day / capacity_max_inp
-          * Calculate hours per year = required_hours_per_day * workdays_per_week * 52
-        - If operation_hours_per_day is provided, use it for daily hours calculation
+        Cost Categories:
+        ================
         
-        Returns: TCO(monthly_cum_total starting with month 0, and final ca/cc/co/cm)
+        Ca - ACQUISITION COSTS (One-time, Month 0):
+        - Machine list price
+        
+        Cc - COMMISSIONING COSTS (One-time, Month 0):
+        - Training costs
+        - Construction costs (cost per kg × machine weight)
+        
+        Co - OPERATING COSTS (Monthly):
+        - Electricity consumption (power × hours × electricity rate)
+        - Water consumption (flow rate × hours × water rate)
+        - Cleaning costs (every 10 hours, 2 hours downtime + cleaning agent costs)
+        - Efficiency factors applied to power consumption
+        
+        Cm - MAINTENANCE COSTS (Periodic):
+        - Base service cost based on DMR size
+        - Additional €2000 per service for flat-belt drives
+        - Service triggers: 8000 hours OR 24 months (whichever comes first)
+        - Efficiency factors: flat-belt drives (+1% energy), IE3 efficiency (-1% energy)
+        
+        Operation Hours Calculation:
+        ===========================
+        - If operation_hours_per_year provided: use directly
+        - If throughput_per_day provided: calculate based on machine capacity
+        - If operation_hours_per_day provided: use for daily calculation
+        
+        Returns: TCO object with monthly cumulative totals and final cost breakdown
         """
         # Handle imports for both module and direct execution
         try:
@@ -73,7 +91,10 @@ class MachineData:
         except ImportError:
             from tco import TCO
         
-        # Calculate operation hours per year based on provided parameters
+        # ============================================================================
+        # OPERATION HOURS CALCULATION
+        # ============================================================================
+        
         if operation_hours_per_year is not None:
             # Use provided operation hours directly
             hrs_per_year = operation_hours_per_year
@@ -100,7 +121,7 @@ class MachineData:
         else:
             raise ValueError("Must provide either operation_hours_per_year, throughput_per_day, or operation_hours_per_day")
         
-        # Label (fallback similar to make_label)
+        # Generate label if not provided
         if not label:
             parts = []
             if self.application:
@@ -114,65 +135,165 @@ class MachineData:
                     parts.append(f"DMR {self.dmr}")
             label = " – ".join(parts) if parts else "Machine"
 
+        # ============================================================================
+        # INITIALIZATION AND DATA PREPARATION
+        # ============================================================================
+        
         months = int(years) * 12
         hrs_per_month = float(hrs_per_year) / 12.0
 
-        power_kw   = 0.0 if (self.power_consumption_total_kw is None or math.isnan(self.power_consumption_total_kw)) else float(self.power_consumption_total_kw)
-        water_lps  = 0.0 if (self.op_water_l_s is None or math.isnan(self.op_water_l_s)) else float(self.op_water_l_s)
+        # Extract and validate machine specifications
+        power_kw = 0.0 if (self.power_consumption_total_kw is None or math.isnan(self.power_consumption_total_kw)) else float(self.power_consumption_total_kw)
+        water_lps = 0.0 if (self.op_water_l_s is None or math.isnan(self.op_water_l_s)) else float(self.op_water_l_s)
         water_lpej = 0.0 if (self.op_water_l_it_eject is None or math.isnan(self.op_water_l_it_eject)) else float(self.op_water_l_it_eject)
-        dmr_mm     = float('nan') if (self.dmr is None or (isinstance(self.dmr, float) and math.isnan(self.dmr))) else float(self.dmr)
-        listprice  = 0.0 if (self.list_price is None or math.isnan(self.list_price)) else float(self.list_price)
-        drive_str  = (self.drive_type or "").lower()
+        dmr_mm = float('nan') if (self.dmr is None or (isinstance(self.dmr, float) and math.isnan(self.dmr))) else float(self.dmr)
+        listprice = 0.0 if (self.list_price is None or math.isnan(self.list_price)) else float(self.list_price)
+        drive_str = (self.drive_type or "").lower()
 
-        # Upfront costs at month 0
-        Ca = listprice
-        Cc_upfront = listprice * float(commissioning_pct)
-        extra_maint_upfront = listprice * float(extra_maint_pct)
+        # ============================================================================
+        # Ca - ACQUISITION COSTS (One-time, Month 0)
+        # ============================================================================
+        
+        Ca = listprice  # Machine acquisition cost
 
-        # Service tracking
+        # ============================================================================
+        # Cc - COMMISSIONING COSTS (One-time, Month 0)
+        # ============================================================================
+        
+        # Training costs
+        training_total = training_cost
+        
+        # Construction costs (cost per kg × machine weight)
+        construction_total = construction_cost_per_kg * self.total_weight_kg
+        
+        Cc = training_total + construction_total
+
+        # ============================================================================
+        # Cm - MAINTENANCE COSTS (Periodic)
+        # ============================================================================
+        
+        # Base service cost based on DMR size
         base_service_cost = self.service_price_from_dmr(dmr_mm)
-        hours_since_service = 0.0
-        months_since_service = 0
-
-        # Extra maintenance per service for flat-belt drives
+        
+        # Additional cost for flat-belt drives
         is_flat_belt = ("flat" in drive_str) and ("belt" in drive_str)
         drivetype_extra_per_service = 2000.0 if is_flat_belt else 0.0
+        
+        # Service tracking variables
+        hours_since_service = 0.0
+        months_since_service = 0
+        
+        # Cleaning tracking variables
+        hours_since_cleaning = 0.0
 
-        # Cumulative trackers
+        # ============================================================================
+        # Co - OPERATING COSTS (Monthly)
+        # ============================================================================
+        
+        # Apply efficiency factors to power consumption
+        efficiency_factor = 1.0
+        
+        # Flat-belt drives: +1% energy consumption
+        if is_flat_belt:
+            efficiency_factor += 0.01
+        
+        # IE3 efficiency: -1% energy consumption
+        if self.motor_efficiency and "IE3" in str(self.motor_efficiency).upper():
+            efficiency_factor -= 0.01
+        
+        # Apply efficiency factor to power consumption
+        adjusted_power_kw = power_kw * efficiency_factor
+        
+        # Calculate cleaning costs
+        # Every 10 hours: 2 hours downtime + cleaning agent costs
+        cleaning_interval_hours = 10.0
+        cleaning_downtime_hours = 2.0
+        cleaning_cost_per_cycle = self.bowl_volume_lit * cost_cleaning_eur_per_lit
+        
+        # Calculate unplanned downtime costs
+        # 2% of operation hours per year
+        unplanned_downtime_hours_per_year = hrs_per_year * unplanned_downtime
+        # Note: Unplanned downtime cost would need production value per hour
+        # For now, we'll track the downtime hours but not apply a cost
+
+        # ============================================================================
+        # CUMULATIVE COST TRACKING
+        # ============================================================================
+        
         cum_Ca = Ca
-        cum_Cc = Cc_upfront
+        cum_Cc = Cc
         cum_Co = 0.0
-        cum_Cm = extra_maint_upfront
+        cum_Cm = 0.0
 
         monthly_cum_total: List[float] = []
-        # Month 0 record
+        # Month 0: Record upfront costs
         monthly_cum_total.append(cum_Ca + cum_Cc + cum_Co + cum_Cm)
 
-        # Iterate months 1..N
+        # ============================================================================
+        # MONTHLY ITERATION (Months 1 to N)
+        # ============================================================================
+        
         for _m in range(1, months + 1):
-            # Operating costs this month
-            energy_kwh = power_kw * hrs_per_month
-            water_l_from_flow = water_lps * (hrs_per_month * 3600.0)
-
-            Co_month = (energy_kwh * float(electricity_eur_per_kwh)) + \
-                       (water_l_from_flow * float(water_eur_per_l))
+            # Co - OPERATING COSTS (Monthly)
+            # ===============================
+            
+            # Calculate effective operation hours (accounting for cleaning downtime)
+            effective_hrs_per_month = hrs_per_month
+            
+            # Check for cleaning requirement
+            hours_since_cleaning += hrs_per_month
+            cleaning_cycles_this_month = 0
+            
+            while hours_since_cleaning >= cleaning_interval_hours:
+                # Apply cleaning cost
+                cum_Co += cleaning_cost_per_cycle
+                cleaning_cycles_this_month += 1
+                hours_since_cleaning -= cleaning_interval_hours
+                
+                # Reduce effective operation hours by cleaning downtime
+                effective_hrs_per_month -= cleaning_downtime_hours
+            
+            # Ensure effective hours don't go negative
+            effective_hrs_per_month = max(0.0, effective_hrs_per_month)
+            
+            # Electricity costs (using adjusted power consumption)
+            energy_kwh = adjusted_power_kw * effective_hrs_per_month
+            electricity_cost = energy_kwh * float(electricity_eur_per_kwh)
+            
+            # Water costs (from continuous flow, using effective hours)
+            water_l_from_flow = water_lps * (effective_hrs_per_month * 3600.0)
+            water_cost = water_l_from_flow * float(water_eur_per_l)
+            
+            # Monthly operating cost
+            Co_month = electricity_cost + water_cost
             cum_Co += Co_month
 
-            # Accumulate counters towards service
-            hours_since_service  += hrs_per_month
+            # Cm - MAINTENANCE COSTS (Periodic)
+            # ==================================
+            
+            # Accumulate service counters (using effective hours)
+            hours_since_service += effective_hrs_per_month
             months_since_service += 1
 
-            # Service trigger: earliest of 8000 hours or 24 months
+            # Service trigger: earliest of 8000 hours OR 24 months
             need_service = (hours_since_service >= 8000.0) or (months_since_service >= 24)
 
             if need_service:
-                cum_Cm += base_service_cost + drivetype_extra_per_service
+                # Apply service cost
+                service_cost = base_service_cost + drivetype_extra_per_service
+                cum_Cm += service_cost
+                
+                # Reset service counters
                 hours_since_service = 0.0
                 months_since_service = 0
 
+            # Record cumulative total for this month
             monthly_cum_total.append(cum_Ca + cum_Cc + cum_Co + cum_Cm)
 
-        # Build TCO object
+        # ============================================================================
+        # RETURN TCO OBJECT
+        # ============================================================================
+        
         return TCO(
             label=label,
             monthly_cum_total=monthly_cum_total,
@@ -189,8 +310,6 @@ class MachineData:
         400–700mm -> €15,000
         > 700 mm  -> €20,000
         """
-        if dmr_mm is None or (isinstance(dmr_mm, float) and math.isnan(dmr_mm)):
-            return 15000.0
         if dmr_mm < 400:
             return 10000.0
         if dmr_mm <= 700:

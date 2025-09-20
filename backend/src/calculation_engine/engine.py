@@ -133,8 +133,7 @@ def calculate_tco_for_machine(
     years: int = 5,
     electricity_eur_per_kwh: float = 0.25,
     water_eur_per_l: float = 0.002,
-    commissioning_pct: float = 0.10,
-    extra_maint_pct: float = 0.00,
+    training_cost: float = 0.0,
     label: Optional[str] = None,
     # Operation hours approach
     operation_hours_per_year: Optional[float] = None,
@@ -151,8 +150,7 @@ def calculate_tco_for_machine(
         years: Number of years for calculation
         electricity_eur_per_kwh: Electricity cost per kWh
         water_eur_per_l: Water cost per liter
-        commissioning_pct: Commissioning percentage of list price
-        extra_maint_pct: Extra maintenance percentage of list price
+        training_cost: Training cost for the machine
         label: Custom label for the TCO calculation
         operation_hours_per_year: Hours of operation per year (optional)
         throughput_per_day: Daily throughput in capacity units (optional)
@@ -162,12 +160,12 @@ def calculate_tco_for_machine(
     Returns:
         TCO object with calculated costs
     """
+    
     return machine.calculate_toc(
         years=years,
         electricity_eur_per_kwh=electricity_eur_per_kwh,
         water_eur_per_l=water_eur_per_l,
-        commissioning_pct=commissioning_pct,
-        extra_maint_pct=extra_maint_pct,
+        training_cost=training_cost,
         label=label,
         operation_hours_per_year=operation_hours_per_year,
         throughput_per_day=throughput_per_day,
@@ -180,6 +178,7 @@ def compare_machines(
     years: int = 5,
     electricity_eur_per_kwh: float = 0.25,
     water_eur_per_l: float = 0.002,
+    training_cost: float = 0.0,
     # Operation hours approach
     operation_hours_per_year: Optional[float] = None,
     # Throughput approach
@@ -195,6 +194,7 @@ def compare_machines(
         years: Number of years for calculation
         electricity_eur_per_kwh: Electricity cost per kWh
         water_eur_per_l: Water cost per liter
+        training_cost: Training cost for the machines
         operation_hours_per_year: Hours of operation per year (optional)
         throughput_per_day: Daily throughput in capacity units (optional)
         workdays_per_week: Number of workdays per week (1-7, default 5)
@@ -210,6 +210,7 @@ def compare_machines(
             years=years,
             electricity_eur_per_kwh=electricity_eur_per_kwh,
             water_eur_per_l=water_eur_per_l,
+            training_cost=training_cost,
             operation_hours_per_year=operation_hours_per_year,
             throughput_per_day=throughput_per_day,
             workdays_per_week=workdays_per_week,
