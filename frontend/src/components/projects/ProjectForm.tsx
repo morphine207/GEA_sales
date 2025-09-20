@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Project, Machine } from "@/types/project";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,7 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
   const [tcoResults, setTcoResults] = useState<Array<{ label: string; ca: number; cc: number; co: number; cm: number; total: number }>>([]);
   const [isCalculating, setIsCalculating] = useState(false);
   const [calcError, setCalcError] = useState("");
+  const tcoResultsRef = useRef<HTMLDivElement | null>(null);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('de-DE', {
@@ -63,6 +64,10 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
       setTcoResults(mapped);
 
       setHasCalculated(true);
+      // Smoothly scroll to the machines (TCO results) section
+      setTimeout(() => {
+        tcoResultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
     } catch (e) {
       setCalcError("Backend calculation failed.");
       setTcoResults([]);
@@ -354,7 +359,7 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
 
       {/* TCO Results Section */}
       {hasCalculated && (
-        <div className="mt-8">
+        <div ref={tcoResultsRef} className="mt-8">
           <div className="mb-4">
             <h3 className="text-lg font-semibold text-foreground">MOST COST-EFFECTIVE MACHINES (TCO)</h3>
             {isCalculating && (
@@ -378,11 +383,11 @@ export function ProjectForm({ project, onUpdate, isNewProject = false }: Project
               {/* Backend results table */}
               <div className="grid grid-cols-6 gap-4 px-4 py-2 text-sm font-medium text-muted-foreground border-b border-border">
                 <div>LABEL</div>
-                <div>Ca</div>
-                <div>Cc</div>
-                <div>Co</div>
-                <div>Cm</div>
-                <div>TOTAL</div>
+                <div>Acquisition</div>
+                <div>Commissioning</div>
+                <div>Operating</div>
+                <div>Maintenance</div>
+                <div>Total</div>
               </div>
               {tcoResults.map((r, idx) => (
                 <Card key={idx} className="p-4 bg-accent/10">
