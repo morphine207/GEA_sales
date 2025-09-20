@@ -215,13 +215,39 @@ async def calculate_project_tco(
         # Calculate TCO for each relevant machine
         tco_results = []
         for machine in relevant_machines:
-            # Derive training_cost from commissioning percentage of machine list price
-            training_cost = (machine.list_price or 0.0) * float(request.commissioning_pct)
+            # Commissioning should be construction-only (5 €/kg × total weight).
+            # Set training_cost to 0 so Cc = construction_cost_per_kg × total_weight_kg.
+            training_cost = 0.0
 
-            # Fallback to project defaults if not supplied in request
-            calc_years = request.years or project.years
-            calc_electricity = request.electricity_eur_per_kwh or project.energy_price_eur_per_kwh
-            calc_water = request.water_eur_per_l or project.water_price_eur_per_l
+            # Fallback to project defaults if not supplied in request (preserve zeros)
+            calc_years = request.years if request.years is not None else project.years
+            calc_electricity = (
+                request.electricity_eur_per_kwh
+                if request.electricity_eur_per_kwh is not None
+                else project.energy_price_eur_per_kwh
+            )
+            calc_water = (
+                request.water_eur_per_l
+                if request.water_eur_per_l is not None
+                else project.water_price_eur_per_l
+            )
+
+            # Determine workdays per week, allowing request override
+            calc_workdays_per_week = (
+                request.workdays_per_week
+                if request.workdays_per_week is not None
+                else project.workdays_per_week
+            )
+
+            # Default to 20 hours/day cap when performing throughput-based calculations and not explicitly provided
+            has_throughput = (
+                request.throughput_per_day is not None or project.customer_throughput_per_day is not None
+            )
+            effective_hours_per_day = (
+                request.operation_hours_per_day
+                if request.operation_hours_per_day is not None
+                else (20 if has_throughput else None)
+            )
 
             tco = calculate_tco_for_machine(
                 machine,
@@ -231,9 +257,13 @@ async def calculate_project_tco(
                 training_cost=training_cost,
                 label=request.label,
                 operation_hours_per_year=request.operation_hours_per_year,
-                throughput_per_day=project.customer_throughput_per_day,
-                workdays_per_week=project.workdays_per_week,
-                operation_hours_per_day=request.operation_hours_per_day
+                throughput_per_day=(
+                    request.throughput_per_day
+                    if request.throughput_per_day is not None
+                    else project.customer_throughput_per_day
+                ),
+                workdays_per_week=calc_workdays_per_week,
+                operation_hours_per_day=effective_hours_per_day
             )
             tco_results.append(tco.to_dict())
         
