@@ -232,6 +232,69 @@ def save_machines_to_json(machines: List[MachineData], filepath: str) -> None:
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump([m.to_dict() for m in machines], f, ensure_ascii=False, indent=2)
 
+def _machine_meets_project_constraints(machine: MachineData, project) -> bool:
+    """
+    Shared validation to decide if a machine configuration is legit for a given project.
+
+    Rules:
+    - Application and sub-application compatibility are handled in caller.
+    - Solids percentage must be within machine's min/max range.
+    - Throughput feasibility considering daily operation cap (20 h/day) when project provides daily throughput.
+      If project provides customer_throughput_per_day > 0:
+        - Required hours per day = throughput_per_day / capacity_max_inp
+        - Must be <= 20 hours/day to be feasible
+    - Protection class and motor efficiency must meet/exceed requirements.
+    - Physical constraints: machine dimensions must fit within project's max length/width/height; weight <= maxWeight.
+    """
+    # Solids check
+    if not (machine.feed_solids_min_vol_perc <= project.solids_percentage <= machine.feed_solids_max_vol_perc):
+        return False
+
+    # Throughput vs hours/day cap (20h)
+    try:
+        throughput_per_day = float(project.customer_throughput_per_day)
+    except Exception:
+        throughput_per_day = 0.0
+
+    if throughput_per_day > 0:
+        capacity_max = 0.0 if (machine.capacity_max_inp is None or math.isnan(machine.capacity_max_inp)) else float(machine.capacity_max_inp)
+        if capacity_max <= 0:
+            return False
+        required_hours_per_day = throughput_per_day / capacity_max
+        if required_hours_per_day > 20.0:
+            return False
+
+    # Protection class
+    if not _protection_class_meets_requirement(machine.protection_class, project.protection_class):
+        return False
+
+    # Motor efficiency
+    if not _motor_efficiency_meets_requirement(machine.motor_efficiency, project.motor_efficiency):
+        return False
+
+    # Physical constraints (allow zeros meaning no constraint)
+    try:
+        max_len = float(project.length_mm)
+        max_wid = float(project.width_mm)
+        max_hei = float(project.height_mm)
+        max_weight = float(project.weight_kg)
+    except Exception:
+        max_len = max_wid = max_hei = max_weight = 0.0
+
+    def is_positive(x: float) -> bool:
+        return isinstance(x, (int, float)) and not math.isnan(x) and x > 0
+
+    if is_positive(max_len) and machine.length_mm > max_len:
+        return False
+    if is_positive(max_wid) and machine.width_mm > max_wid:
+        return False
+    if is_positive(max_hei) and machine.height_mm > max_hei:
+        return False
+    if is_positive(max_weight) and machine.total_weight_kg > max_weight:
+        return False
+
+    return True
+
 def filter_machines_for_project(machines: List[MachineData], project) -> List[MachineData]:
     """
     Filter machines based on project requirements.
@@ -263,21 +326,9 @@ def filter_machines_for_project(machines: List[MachineData], project) -> List[Ma
         if (project.sub_application.lower() not in machine.sub_application.lower() and
             machine.sub_application.lower() not in project.sub_application.lower()):
             continue
-        
-        # Check solids percentage is within machine's range
-        if (not (machine.feed_solids_min_vol_perc <= project.solids_percentage <= machine.feed_solids_max_vol_perc)):
-            continue
-        
-        # Check throughput capacity (machine should be able to handle project throughput)
-        if machine.capacity_max_inp < project.customer_throughput_per_day:
-            continue
-        
-        # Check protection class (machine should meet or exceed project requirements)
-        if not _protection_class_meets_requirement(machine.protection_class, project.protection_class):
-            continue
-        
-        # Check motor efficiency (machine should meet or exceed project requirements)
-        if not _motor_efficiency_meets_requirement(machine.motor_efficiency, project.motor_efficiency):
+
+        # Shared comprehensive constraint check
+        if not _machine_meets_project_constraints(machine, project):
             continue
         
         relevant_machines.append(machine)

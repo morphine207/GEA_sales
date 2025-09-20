@@ -37,6 +37,7 @@ export default function Compare() {
   // Data
   const [series, setSeries] = useState<{ name: string; monthly_cum_total: number[]; ca: number; cc: number; co: number; cm: number }[]>([]);
   const [isFetching, setIsFetching] = useState(false);
+  const [displaySlots, setDisplaySlots] = useState<Array<{ name: string; valid: boolean; data?: { monthly_cum_total: number[]; ca: number; cc: number; co: number; cm: number } }>>([]);
 
   useEffect(() => {
     (async () => {
@@ -82,9 +83,23 @@ export default function Compare() {
         .slice(0, 3)
         .map(({ _total, ...rest }) => rest);
       setSeries(top3);
+
+      // Update display slots: keep initial top3 as slots; on updates, gray out missing ones, don't auto-replace
+      const currentMap = new Map(top3.map(s => [s.name, s]));
+      setDisplaySlots(prev => {
+        if (!prev.length) {
+          return top3.map(s => ({ name: s.name, valid: true, data: s })).slice(0, 3);
+        }
+        return prev.map(slot => {
+          const s = currentMap.get(slot.name);
+          if (s) return { name: slot.name, valid: true, data: s };
+          return { ...slot, valid: false, data: undefined };
+        });
+      });
     } catch (e) {
       setError("Calculation failed");
       setSeries([]);
+      // On error, keep existing displaySlots as-is
     } finally {
       setIsFetching(false);
     }
@@ -198,22 +213,32 @@ export default function Compare() {
             </Card>
           </div>
 
-          {/* Bottom: machine breakdowns */}
-          {series.length > 0 && (
+          {/* Bottom: machine breakdowns (keep slots, gray out invalid, only chart valid) */}
+          {displaySlots.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {series.slice(0, 3).map((s, idx) => {
-                const total = s.monthly_cum_total?.[s.monthly_cum_total.length - 1] ?? 0;
-                const borderColor = idx === 0 ? chartConfig.s1.color : idx === 1 ? chartConfig.s2.color : chartConfig.s3.color;
+              {displaySlots.map((slot, idx) => {
+                const si = series.findIndex(s => s.name === slot.name);
+                const borderColor = si === 0 ? chartConfig.s1.color : si === 1 ? chartConfig.s2.color : si === 2 ? chartConfig.s3.color : "#9ca3af";
+                const total = slot.data ? (slot.data.monthly_cum_total?.[slot.data.monthly_cum_total.length - 1] ?? 0) : 0;
                 return (
-                  <Card key={idx} className="p-4 border-2" style={{ borderColor }}>
-                    <div className="font-semibold mb-2">{s.name}</div>
-                    <div className="text-sm text-muted-foreground mb-3">Total: <span className="font-semibold text-foreground">{currency(total)}</span></div>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center justify-between"><span>Acquisition</span><span>{currency(s.ca)}</span></div>
-                      <div className="flex items-center justify-between"><span>Commissioning</span><span>{currency(s.cc)}</span></div>
-                      <div className="flex items-center justify-between"><span>Operating</span><span>{currency(s.co)}</span></div>
-                      <div className="flex items-center justify-between"><span>Maintenance</span><span>{currency(s.cm)}</span></div>
-                    </div>
+                  <Card key={`${slot.name}-${idx}`} className={`p-4 border-2 ${slot.valid ? "" : "opacity-50"}`} style={{ borderColor }}>
+                    <div className="font-semibold mb-1">{slot.name}</div>
+                    {!slot.valid && (
+                      <div className="text-xs text-muted-foreground mb-2">Not valid at current settings</div>
+                    )}
+                    {slot.valid && slot.data ? (
+                      <>
+                        <div className="text-sm text-muted-foreground mb-3">Total: <span className="font-semibold text-foreground">{currency(total)}</span></div>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex items-center justify-between"><span>Acquisition</span><span>{currency(slot.data.ca)}</span></div>
+                          <div className="flex items-center justify-between"><span>Commissioning</span><span>{currency(slot.data.cc)}</span></div>
+                          <div className="flex items-center justify-between"><span>Operating</span><span>{currency(slot.data.co)}</span></div>
+                          <div className="flex items-center justify-between"><span>Maintenance</span><span>{currency(slot.data.cm)}</span></div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">No costs available</div>
+                    )}
                   </Card>
                 );
               })}
