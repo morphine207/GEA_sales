@@ -17,7 +17,7 @@ export interface Project {
   mail: string;
   application: string;
   subApplication: string;
-  feedSolid: string;
+  feedSolid: number;
   capacityPerDay: number;
   // Calculation details
   years: number;

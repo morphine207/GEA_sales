@@ -12,7 +12,7 @@ export function createNewProject(): Project {
     mail: '',
     application: '',
     subApplication: '',
-    feedSolid: '',
+    feedSolid: 0,
     capacityPerDay: 0,
     years: 5,
     workdaysPerWeek: 5,

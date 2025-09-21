@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Project, Machine } from "@/types/project";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,9 +7,13 @@ import { Card } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { apiCalculateProjectTCO } from "@/lib/api";
 import { apiMagicFill } from "@/lib/api";
+import { apiListMachines } from "@/lib/api";
+import type { BackendMachine } from "@/lib/api";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Wand2, Check, X } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { machineSpecifications } from "@/data/machineSpecifications";
 
 interface ProjectFormProps {
   project: Project;
@@ -20,10 +24,11 @@ export function ProjectForm({ project, onUpdate }: ProjectFormProps) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<Project>(project);
   const [hasCalculated, setHasCalculated] = useState(true);
-  const [tcoResults, setTcoResults] = useState<Array<{ label: string; ca: number; cc: number; co: number; cm: number; total: number }>>([]);
+  const [tcoResults, setTcoResults] = useState<Array<{ name: string; ca: number; cc: number; co: number; cm: number; total: number }>>([]);
   const [isCalculating, setIsCalculating] = useState(false);
   const [calcError, setCalcError] = useState("");
   const tcoResultsRef = useRef<HTMLDivElement | null>(null);
+  const [allMachines, setAllMachines] = useState<BackendMachine[] | null>(null);
 
   // Title editing state
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -67,7 +72,7 @@ export function ProjectForm({ project, onUpdate }: ProjectFormProps) {
         mail: p?.email ?? formData.mail,
         application: p?.application ?? formData.application,
         subApplication: p?.sub_application ?? formData.subApplication,
-        feedSolid: (p?.solids_percentage != null && !Number.isNaN(p.solids_percentage)) ? String(p.solids_percentage) : formData.feedSolid,
+        feedSolid: (p?.solids_percentage != null && !Number.isNaN(Number(p.solids_percentage))) ? Number(p.solids_percentage) : Number(formData.feedSolid) || 0,
         capacityPerDay: (p?.customer_throughput_per_day != null) ? Number(p.customer_throughput_per_day) : formData.capacityPerDay,
         years: (p?.years != null) ? Number(p.years) : formData.years,
         workdaysPerWeek: (p?.workdays_per_week != null) ? Number(p.workdays_per_week) : formData.workdaysPerWeek,
@@ -103,6 +108,79 @@ export function ProjectForm({ project, onUpdate }: ProjectFormProps) {
     const updatedProject = { ...formData, [field]: value };
     setFormData(updatedProject);
   };
+
+  // Load machine list from backend to drive dropdowns
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const resp = await apiListMachines();
+        if (!isMounted) return;
+        setAllMachines(resp.machines || []);
+      } catch {
+        // Fallback to static dataset if backend fetch fails
+        setAllMachines(null);
+      }
+    })();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Derived dropdown options from machine specifications
+  const applicationOptions = useMemo(() => {
+    const set = new Set<string>();
+    if (allMachines && allMachines.length > 0) {
+      allMachines.forEach(m => { if (m.application) set.add(m.application); });
+    } else {
+      machineSpecifications.forEach(m => { if (m.application) set.add(m.application); });
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [allMachines]);
+
+  const subApplicationOptions = useMemo(() => {
+    const set = new Set<string>();
+    if (allMachines && allMachines.length > 0) {
+      allMachines
+        .filter(m => !formData.application || m.application === formData.application)
+        .forEach(m => { if (m.sub_application) set.add(m.sub_application); });
+    } else {
+      machineSpecifications
+        .filter(m => !formData.application || m.application === formData.application)
+        .forEach(m => { if (m.subApplication) set.add(m.subApplication); });
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [formData.application, allMachines]);
+
+  const protectionClassOptions = useMemo(() => {
+    const set = new Set<string>();
+    if (allMachines && allMachines.length > 0) {
+      allMachines.forEach(m => { if (m.protection_class) set.add(m.protection_class); });
+    } else {
+      machineSpecifications.forEach(m => { if (m.protectionClass) set.add(m.protectionClass); });
+    }
+    return Array.from(set).sort();
+  }, [allMachines]);
+
+  const motorEfficiencyOptions = useMemo(() => {
+    const set = new Set<string>();
+    if (allMachines && allMachines.length > 0) {
+      allMachines.forEach(m => { if (typeof m.motor_efficiency === 'string' && m.motor_efficiency && m.motor_efficiency.trim().length > 0) set.add(m.motor_efficiency); });
+    } else {
+      machineSpecifications.forEach(m => { if (typeof m.motorEfficiency === 'string' && m.motorEfficiency.trim().length > 0) set.add(m.motorEfficiency); });
+    }
+    return Array.from(set).sort();
+  }, [allMachines]);
+
+  // Ensure subApplication is always a valid option for the selected application
+  useEffect(() => {
+    if (!formData.application) return;
+    if (!subApplicationOptions.includes(formData.subApplication)) {
+      const first = subApplicationOptions[0] || "";
+      if (first !== formData.subApplication) {
+        setFormData(prev => ({ ...prev, subApplication: first }));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.application, subApplicationOptions]);
 
   const handleCalculate = async () => {
     // Call backend TCO calculation using the project name as identifier
@@ -347,28 +425,50 @@ export function ProjectForm({ project, onUpdate }: ProjectFormProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <Label htmlFor="application" className="text-sm font-medium text-muted-foreground">APPLICATION</Label>
-              <Input
-                id="application"
-                value={formData.application}
-                onChange={(e) => handleFieldChange('application', e.target.value)}
-                className="mt-0.5"
-              />
+              <Select
+                value={formData.application || undefined}
+                onValueChange={(val) => {
+                  const subs = (allMachines && allMachines.length > 0)
+                    ? allMachines.filter(m => m.application === val).map(m => m.sub_application)
+                    : machineSpecifications.filter(m => m.application === val).map(m => m.subApplication);
+                  const first = subs.sort((a, b) => a.localeCompare(b))[0] || "";
+                  setFormData(prev => ({ ...prev, application: val, subApplication: first }));
+                }}
+              >
+                <SelectTrigger id="application" className="mt-0.5">
+                  <SelectValue placeholder="Select application" />
+                </SelectTrigger>
+                <SelectContent>
+                  {applicationOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="subApplication" className="text-sm font-medium text-muted-foreground">SUB APPLICATION</Label>
-              <Input
-                id="subApplication"
-                value={formData.subApplication}
-                onChange={(e) => handleFieldChange('subApplication', e.target.value)}
-                className="mt-0.5"
-              />
+              <Select
+                value={formData.subApplication || undefined}
+                onValueChange={(val) => handleFieldChange('subApplication', val)}
+              >
+                <SelectTrigger id="subApplication" className="mt-0.5">
+                  <SelectValue placeholder="Select sub application" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subApplicationOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="feedSolid" className="text-sm font-medium text-muted-foreground">FEED SOLID (%)</Label>
               <Input
                 id="feedSolid"
-                value={formData.feedSolid}
-                onChange={(e) => handleFieldChange('feedSolid', e.target.value)}
+                type="number"
+                step="0.1"
+                value={Number(formData.feedSolid) ?? 0}
+                onChange={(e) => handleFieldChange('feedSolid', Number(e.target.value))}
                 className="mt-0.5"
               />
             </div>
@@ -440,21 +540,35 @@ export function ProjectForm({ project, onUpdate }: ProjectFormProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
             <div>
               <Label htmlFor="protectionClass" className="text-sm font-medium text-muted-foreground">PROTECTION CLASS</Label>
-              <Input
-                id="protectionClass"
-                value={formData.protectionClass}
-                onChange={(e) => handleFieldChange('protectionClass', e.target.value)}
-                className="mt-0.5"
-              />
+              <Select
+                value={formData.protectionClass || undefined}
+                onValueChange={(val) => handleFieldChange('protectionClass', val)}
+              >
+                <SelectTrigger id="protectionClass" className="mt-0.5">
+                  <SelectValue placeholder="Select protection class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {protectionClassOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="motorEfficiency" className="text-sm font-medium text-muted-foreground">MOTOR EFFICIENCY</Label>
-              <Input
-                id="motorEfficiency"
-                value={formData.motorEfficiency}
-                onChange={(e) => handleFieldChange('motorEfficiency', e.target.value)}
-                className="mt-0.5"
-              />
+              <Select
+                value={formData.motorEfficiency || undefined}
+                onValueChange={(val) => handleFieldChange('motorEfficiency', val)}
+              >
+                <SelectTrigger id="motorEfficiency" className="mt-0.5">
+                  <SelectValue placeholder="Select motor efficiency" />
+                </SelectTrigger>
+                <SelectContent>
+                  {motorEfficiencyOptions.map(opt => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="maxWidth" className="text-sm font-medium text-muted-foreground">MAX WIDTH (mm)</Label>

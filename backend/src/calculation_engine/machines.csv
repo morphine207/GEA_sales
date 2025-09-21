@@ -9,10 +9,11 @@ Citrus,Citrus processing,4.0,6.0,5000,8500.0,integrated direct drive,premium - L
 Wine,Clarific. of Sparkling Wine,0.3,0.5,2000,2500.0,flat - belt drive,standard - Level,GFA 10-43-210,260,83397.0,7.5,IP55,≥ IE3,2.5,0.5,0.6,1070.0,490.0,830.0,220.0,48.0,66.0,2.0,HydroStop,6.0
 Wine,Clarific. of Sparkling Wine,0.3,0.5,27000,30000.0,flat - belt drive,standard - Level,GFA 100-43-913,660,230596.0,45.0,IP55,≥ IE3,2.5,0.8,3.5,2450.0,1250.0,1820.0,3270.0,720.0,550.0,50.0,HydroStop,36.0
 Wine,Clarific. of Sparkling Wine,0.3,0.5,5000,6000.0,flat - belt drive,standard - Level,GFA 40-87-600,312,112631.0,10.5,IP55,≥ IE3,2.5,0.5,0.6,1180.0,540.0,950.0,320.0,71.0,86.0,3.0,HydroStop,8.4
-Wine,Clarific. of Sparkling Wine,0.3,0.5,8000,9000.0,flat - belt drive,standard - Level,GFA 40-12-596,440,143642.0,18.5,IP55,≥ IE3,2.5,0.8,1.9,1690.0,810.0,1220.0,730.0,230.0,150.0,9.0,HydroStop,14.8
+Wine,Clarific. of Sparkling Wine,0.3,0.5,8000,9000.0,flat - belt drive,standard - Level,GFA 40-12-596,440,233642.0,18.5,IP55,≥ IE3,2.5,0.8,1.9,1690.0,810.0,1220.0,730.0,230.0,150.0,9.0,HydroStop,14.8
 Beer,Clarification of Kwass,0.2,0.5,16000,26000.0,integrated direct drive,premium - Level,GFA 200-98-270,810,307128.0,55.0,IP00,-,2.5,1.0,7.5,2000.0,2070.0,2080.0,2900.0,1200.0,0.0,63.0,piston valve,44.0
 Beer,Clarification of Kwass,0.2,0.5,21000,28500.0,integrated direct drive,premium - Level,GFA 200-18-944,810,349252.0,55.0,IP00,-,2.5,1.0,7.5,2000.0,2070.0,2080.0,2900.0,1200.0,0.0,70.0,piston valve,44.0
 Tea,Clarification of RTD Tea,0.2,0.5,1000,1800.0,flat - belt drive,standard - Level,GFA 10-50-645,260,79612.0,7.5,IP55,≥ IE3,2.5,0.5,0.6,1070.0,490.0,830.0,220.0,48.0,66.0,2.0,HydroStop,6.0
 Tea,Clarification of RTD Tea,0.2,0.5,11000,21000.0,flat - belt drive,standard - Level,GFA 100-14-242,660,207913.0,45.0,IP55,≥ IE3,2.5,0.8,3.5,2450.0,1250.0,1820.0,3270.0,720.0,550.0,50.0,HydroStop,36.0
 Fruit Juice,Fruit Juice,2.0,4.0,20000,21000.0,integrated direct drive,premium - Level,GFA 200-69-517,810,338917.0,55.0,IP00,-,2.5,1.2,11.0,1480.0,1730.0,2070.0,3100.0,1400.0,0.0,69.0,HydroStop,44.0
 Fruit Juice,Fruit Juice,2.0,4.0,24000,27000.0,flat - belt drive,premium - Level,GFA 200-78-266,810,331419.0,55.0,IP55,≥ IE3,2.5,1.2,11.0,2230.0,1730.0,1970.0,4000.0,1200.0,900.0,69.0,HydroStop,44.0
+Wine,Clarific. of Sparkling Wine,0.3,0.5,7500,8500,flat - belt drive,standard - Level,GFA 40-50-598,376,132137.0,31.5,IP55,≥ IE3,2.5,0.65,1.25,1435.0,675.0,1085.0,525.0,150.5,118.0,6.0,HydroStop,31.5

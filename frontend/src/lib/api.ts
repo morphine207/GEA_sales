@@ -194,7 +194,7 @@ export function mapBackendProjectToFrontend(bp: BackendProject): Project {
     mail: bp.email,
     application: bp.application,
     subApplication: bp.sub_application,
-    feedSolid: String(bp.solids_percentage ?? ""),
+    feedSolid: Number(bp.solids_percentage ?? 0) || 0,
     capacityPerDay: bp.customer_throughput_per_day,
     years: bp.years ?? 5,
     workdaysPerWeek: bp.workdays_per_week ?? 5,

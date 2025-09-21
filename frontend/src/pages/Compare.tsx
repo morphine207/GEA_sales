@@ -64,7 +64,7 @@ export default function Compare() {
   // Slider state
   const [years, setYears] = useState<number>(5);
   const [throughputPerDay, setThroughputPerDay] = useState<number>(0);
-  const [operationHoursPerDay, setOperationHoursPerDay] = useState<number>(20);
+  const [operationHoursPerDay, setOperationHoursPerDay] = useState<number>(16);
   const [electricityEurPerKwh, setElectricityEurPerKwh] = useState<number>(0.25);
   const [waterEurPerL, setWaterEurPerL] = useState<number>(0.002);
   const initialThroughputRef = useRef<number>(0);
@@ -124,7 +124,7 @@ export default function Compare() {
         const name = (machine?.langtyp || "").toString().trim() || r.label;
         const total = r.monthly_cum_total?.[r.monthly_cum_total.length - 1] ?? 0;
         const maxPerHour = Number(machine?.capacity_max_inp) || 0;
-        const maxPerDay = maxPerHour * (operationHoursPerDay || 20);
+        const maxPerDay = maxPerHour * (operationHoursPerDay || 16);
         const capacityOk = (throughputPerDay || 0) <= maxPerDay;
         return {
           name,
@@ -306,9 +306,6 @@ export default function Compare() {
               <div className="font-semibold">Compare top 3 machines</div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="text-sm text-muted-foreground">
-                {loading ? "Loading…" : error ? error : series.length ? `${series.length} variants` : "No results"}
-              </div>
               <Button
                 onClick={handleOpenAssistant}
                 disabled={loading || isFetching}
@@ -356,10 +353,10 @@ export default function Compare() {
             {/* Chart */}
             <Card className="p-4 lg:col-span-3">
               <ChartContainer config={chartConfig} className="w-full h-[320px]">
-                <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+                <LineChart data={chartData} margin={{ top: 0, right: 8, bottom: 0, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                  <YAxis tickFormatter={(v) => currency(Number(v))} tickLine={false} axisLine={false} width={80} />
+                  <XAxis dataKey="month" type="number" domain={[1, 'dataMax']} allowDecimals={false} tickLine={false} axisLine={false} />
+                  <YAxis domain={['dataMin', 'dataMax']} tickFormatter={(v) => currency(Number(v))} tickLine={false} axisLine={false} width={80} />
                   <ChartTooltip content={<ChartTooltipContent formatter={(value) => currency(Number(value))} />} />
                   {lines.map((l, i) => (
                     <Line key={l.dataKey} type="monotone" dataKey={l.dataKey} stroke={`var(--color-s${i + 1})`} strokeWidth={2} dot={false} isAnimationActive={false} />

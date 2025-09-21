@@ -1,5 +1,8 @@
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Settings2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEffect, useMemo, useState } from "react";
 import { apiListMachines, BackendMachine } from "@/lib/api";
@@ -72,6 +75,7 @@ export function MachineSpecsTable() {
   const [machines, setMachines] = useState<UIMachine[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
+  
 
   useEffect(() => {
     let isMounted = true;
@@ -158,7 +162,7 @@ export function MachineSpecsTable() {
           <Card className="p-6 mt-4 text-sm text-red-600">{error}</Card>
         )}
         <div className="min-w-full">
-          <div className="grid grid-cols-12 md:grid-cols-13 gap-2 px-4 py-3 text-xs font-medium text-muted-foreground border-b border-border bg-muted/30 rounded-t-lg">
+          <div className="grid grid-cols-12 md:grid-cols-14 gap-2 px-4 py-3 text-xs font-medium text-muted-foreground border-b border-border bg-muted/30 rounded-t-lg">
             <div className="col-span-2">MODEL & APPLICATION</div>
             <div>CAPACITY</div>
             <div>PRICE</div>
@@ -169,6 +173,7 @@ export function MachineSpecsTable() {
             <div>WATER</div>
             <div>DRIVE</div>
             <div>PROTECTION</div>
+            <div>EDIT</div>
             <div>EFFICIENCY</div>
             <div>EJECTION</div>
           </div>
@@ -176,7 +181,7 @@ export function MachineSpecsTable() {
           <div className="space-y-2 mt-2">
             {filteredMachines.map((m, index) => (
               <Card key={`${m.modelNumber}-${index}`} className="p-4 hover:bg-accent/20 transition-colors">
-                <div className="grid grid-cols-12 md:grid-cols-13 gap-2 text-sm">
+                <div className="grid grid-cols-12 md:grid-cols-14 gap-2 text-sm">
                   <div className="col-span-2">
                     <div className="font-semibold text-primary hover:underline cursor-pointer">{m.modelNumber}</div>
                     <div className="text-xs text-muted-foreground">{m.application}</div>
@@ -225,6 +230,137 @@ export function MachineSpecsTable() {
 
                   <div>
                     <div className="font-medium">{m.protectionClass}</div>
+                  </div>
+
+                  <div className="flex items-start justify-start">
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-1">
+                          <Settings2 className="h-4 w-4" />
+                          Edit
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-2xl md:max-w-4xl lg:max-w-6xl w-[95vw]">
+                        <DialogHeader>
+                          <DialogTitle>Edit Machine</DialogTitle>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-2 md:grid-cols-4">
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Model</div>
+                            <Input defaultValue={m.modelNumber} className="col-span-3" />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Application</div>
+                            <Input defaultValue={m.application} className="col-span-3" />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Sub-Application</div>
+                            <Input defaultValue={m.subApplication} className="col-span-3" />
+                          </div>
+
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Bowl ⌀ (mm)</div>
+                            <Input type="number" defaultValue={m.bowlDiameter} className="col-span-3" />
+                          </div>
+
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Capacity Min (L/h)</div>
+                            <Input type="number" defaultValue={m.capacityMinInp} className="col-span-3" />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Capacity Max (L/h)</div>
+                            <Input type="number" defaultValue={m.capacityMaxInp} className="col-span-3" />
+                          </div>
+
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Feed Solids Min (%)</div>
+                            <Input type="number" defaultValue={m.feedSolidsMin} className="col-span-3" />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Feed Solids Max (%)</div>
+                            <Input type="number" defaultValue={m.feedSolidsMax} className="col-span-3" />
+                          </div>
+
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">List Price (€)</div>
+                            <Input type="number" defaultValue={m.listPrice} className="col-span-3" />
+                          </div>
+
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Motor Power (kW)</div>
+                            <Input type="number" defaultValue={m.motorPowerKW} className="col-span-3" />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Total Power (kW)</div>
+                            <Input type="number" defaultValue={m.powerConsumptionTotalKW} className="col-span-3" />
+                          </div>
+
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Length (mm)</div>
+                            <Input type="number" defaultValue={m.length} className="col-span-3" />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Width (mm)</div>
+                            <Input type="number" defaultValue={m.width} className="col-span-3" />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Height (mm)</div>
+                            <Input type="number" defaultValue={m.height} className="col-span-3" />
+                          </div>
+
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Total Weight (kg)</div>
+                            <Input type="number" defaultValue={m.totalWeightKg} className="col-span-3" />
+                          </div>
+
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Bowl Volume (L)</div>
+                            <Input type="number" defaultValue={m.bowlVolumeL} className="col-span-3" />
+                          </div>
+
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Water Flow (L/s)</div>
+                            <Input type="number" defaultValue={m.waterFlowLs} className="col-span-3" />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Water per Ejection (L)</div>
+                            <Input type="number" defaultValue={m.waterPerEjectionL} className="col-span-3" />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Water Supply (bar)</div>
+                            <Input type="number" defaultValue={m.waterSupplyBar} className="col-span-3" />
+                          </div>
+
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Drive Type</div>
+                            <Input defaultValue={m.driveType} className="col-span-3" />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Level</div>
+                            <Input defaultValue={m.level} className="col-span-3" />
+                          </div>
+
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Protection Class</div>
+                            <Input defaultValue={m.protectionClass} className="col-span-3" />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Motor Efficiency</div>
+                            <Input defaultValue={m.motorEfficiency} className="col-span-3" />
+                          </div>
+
+                          <div className="grid grid-cols-4 items-center gap-2">
+                            <div className="text-sm text-muted-foreground col-span-1">Ejection System</div>
+                            <Input defaultValue={m.ejectionSystem} className="col-span-3" />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <DialogClose asChild>
+                            <Button>Save</Button>
+                          </DialogClose>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   </div>
 
                   <div>

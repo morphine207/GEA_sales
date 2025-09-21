@@ -36,7 +36,7 @@ export function Sidebar({ activeItem, onItemClick }: SidebarProps) {
           <span className="text-primary-foreground text-sm font-bold">M</span>
         </div>
         <div className="text-sm">
-          <div className="font-medium text-sidebar-foreground">MEIK</div>
+          <div className="font-medium text-sidebar-foreground">JIM</div>
           <div className="text-sidebar-foreground/70">ADMIN</div>
         </div>
       </div>
