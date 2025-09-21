@@ -40,6 +40,9 @@ type SeriesItem = {
   capacityOk: boolean;
   needed_hours_per_day?: number | null;
   available_hours_per_day?: number | null;
+  // Extra machine metadata for display
+  driveType?: string;
+  diameterMm?: number;
 };
 
 type DisplaySlot = {
@@ -136,6 +139,8 @@ export default function Compare() {
           capacityOk,
           needed_hours_per_day: r.needed_hours_per_day,
           available_hours_per_day: r.available_hours_per_day,
+          driveType: machine?.drive_type || undefined,
+          diameterMm: typeof machine?.dmr === 'number' ? machine.dmr : Number(machine?.dmr) || undefined,
           _total: total,
         } as SeriesItem & { _total: number };
       });
@@ -293,7 +298,7 @@ export default function Compare() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <Header onNewProject={() => navigate("/project/new")} />
+      <Header />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar activeItem={activeMenuItem} onItemClick={handleMenuItemClick} />
         <main className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -375,13 +380,73 @@ export default function Compare() {
                 const total = slot.data ? (slot.data.monthly_cum_total?.[slot.data.monthly_cum_total.length - 1] ?? 0) : 0;
                 return (
                   <Card key={`${slot.name}-${idx}`} className={`p-4 border-2 ${slot.valid ? "" : "opacity-50"}`} style={{ borderColor }}>
-                    <div className="font-semibold mb-1">{slot.name}</div>
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div>
+                        <div className="text-xs text-muted-foreground leading-none mb-1">Name</div>
+                        <div className="font-semibold text-lg leading-tight">{slot.name}</div>
+                      </div>
+                      {slot.data && (
+                        <div className="text-right">
+                          {/* Size block: 2-col grid with badge on the right spanning two rows */}
+                          <div className="grid grid-cols-[1fr_auto] grid-rows-2 items-center gap-x-4">
+                            <div className="col-start-1 row-start-1 text-xs text-muted-foreground leading-none">Size</div>
+                            <div className="col-start-1 row-start-2 text-base font-medium leading-tight">
+                              {(() => {
+                                const d = slot.data?.diameterMm;
+                                if (!(typeof d === 'number') || Number.isNaN(d)) return '-';
+                                const dm = Math.round(d);
+                                return `Ø ${dm} mm`;
+                              })()}
+                            </div>
+                            <div className="col-start-2 row-start-1 row-span-2">
+                              {(() => {
+                                const d = slot.data?.diameterMm;
+                                if (!(typeof d === 'number') || Number.isNaN(d)) return null;
+                                const dm = Math.round(d);
+                                const sizeLabel = dm <= 300 ? 'XS' : dm <= 400 ? 'S' : dm <= 600 ? 'M' : dm <= 800 ? 'L' : 'XL';
+                                return (
+                                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white text-lg font-bold">
+                                    {sizeLabel}
+                                  </span>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                          <div className="h-4" />
+                          {/* Drive block: 2-col grid with emoji on the right spanning two rows */}
+                          <div className="grid grid-cols-[1fr_auto] grid-rows-2 items-center gap-x-4">
+                            <div className="col-start-1 row-start-1 text-xs text-muted-foreground leading-none">Drive</div>
+                            <div className="col-start-1 row-start-2 text-base font-medium leading-tight">
+                              {(() => {
+                                const raw = (slot.data?.driveType || '').toString();
+                                const v = raw.toLowerCase();
+                                if (v.includes('integrated')) return 'Integrated Drive';
+                                if (v.includes('flat') || v.includes('belt')) return 'Belt Drive';
+                                return raw || '-';
+                              })()}
+                            </div>
+                            <div className="col-start-2 row-start-1 row-span-2">
+                              {(() => {
+                                const raw = (slot.data?.driveType || '').toString();
+                                const v = raw.toLowerCase();
+                                const emoji = v.includes('integrated') ? '⚙️' : (v.includes('flat') || v.includes('belt')) ? '⛓️' : '';
+                                return emoji ? (
+                                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-muted text-2xl">
+                                    <span className="leading-none">{emoji}</span>
+                                  </span>
+                                ) : null;
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     {!slot.valid && (
                       <div className="text-xs text-muted-foreground mb-2">{slot.reason || "Not valid at current settings"}</div>
                     )}
                     {slot.valid && slot.data ? (
                       <>
-                        <div className="text-sm text-muted-foreground mb-3">Total: <span className="font-semibold text-foreground">{currency(total)}</span></div>
+                        <div className="text-sm text-muted-foreground mb-3">Total: <span className="font-semibold text-green-700">{currency(total)}</span></div>
                         {typeof slot.data.needed_hours_per_day === 'number' && typeof slot.data.available_hours_per_day === 'number' && (
                           <div className="mb-3">
                             {(() => {

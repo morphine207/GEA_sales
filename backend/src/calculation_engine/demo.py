@@ -26,7 +26,7 @@ def create_demo_projects() -> List[Project]:
 
     # Matches Wine machines (e.g., GFA 40-87-600 / GFA 40-12-596)
     demo_project_1 = Project(
-        project_name="Wine Project Demo",
+        project_name="Acme Sparkling Wine Clarification Line",
         company_name="Acme Wine Corp",
         telefon_nummer="+49 123 456 789",
         email="sales@acmewine.com",
@@ -49,7 +49,7 @@ def create_demo_projects() -> List[Project]:
 
     # Matches Beer machines (e.g., GFA 200-98-270 / GFA 200-18-944)
     demo_project_2 = Project(
-        project_name="Beer Project Demo",
+        project_name="Bavarian Brewery Kwass Clarification Upgrade",
         company_name="Bavarian Brewery",
         telefon_nummer="+49 987 654 321",
         email="engineering@bavarianbrew.de",
@@ -72,7 +72,7 @@ def create_demo_projects() -> List[Project]:
 
     # Matches Tea machines (e.g., GFA 10-50-645)
     demo_project_3 = Project(
-        project_name="Tea Processing Line",
+        project_name="Alpine RTD Tea Clarification Line",
         company_name="Alpine Tea Co",
         telefon_nummer="+41 555 123 456",
         email="contact@alpinetee.ch",
@@ -93,7 +93,30 @@ def create_demo_projects() -> List[Project]:
         water_price_eur_per_l=0.002,
     )
 
-    return [demo_project_1, demo_project_2, demo_project_3]
+    # Matches Wine machines with higher throughput (up to 85,000/day using 20 h/day cap)
+    demo_project_4 = Project(
+        project_name="NoveWine Project 2026",
+        company_name="NovaTech Solutions GmbH",
+        telefon_nummer="+49 172 9876543",
+        email="max.mueller@novatech.com",
+        contact_person="Max Müller",
+        application="Wine",
+        sub_application="Clarific. of Sparkling Wine",
+        solids_percentage=0.3,
+        customer_throughput_per_day=85000.0,
+        workdays_per_week=5,
+        protection_class="IP55",
+        motor_efficiency="≥ IE3",
+        width_mm=900.0,
+        length_mm=1800.0,
+        height_mm=1400.0,
+        weight_kg=750.0,
+        years=20,
+        energy_price_eur_per_kwh=0.22,
+        water_price_eur_per_l=0.003,
+    )
+
+    return [demo_project_1, demo_project_2, demo_project_3, demo_project_4]
 
 def get_demo_data():
     """

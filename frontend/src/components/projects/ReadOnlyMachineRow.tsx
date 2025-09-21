@@ -19,8 +19,9 @@ export function ReadOnlyMachineRow({ machine }: ReadOnlyMachineRowProps) {
   return (
     <Card className="p-4 bg-accent/10">
       <div className="grid grid-cols-5 gap-4 items-center">
-        <div className="font-medium text-foreground">
-          {machine.name}
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">Name</div>
+          <div className="font-medium text-foreground text-base">{machine.name}</div>
         </div>
         
         <div className="text-foreground">
