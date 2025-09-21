@@ -24,10 +24,11 @@ export function MachineRow({ machine, onChange, onDelete }: MachineRowProps) {
     <Card className="p-4">
       <div className="grid grid-cols-6 gap-4 items-center">
         <div>
+          <div className="text-xs text-muted-foreground mb-1">Name</div>
           <Input
             value={machine.name}
             onChange={(e) => onChange(machine.id, 'name', e.target.value)}
-            className="font-medium"
+            className="font-medium text-base"
           />
         </div>
         

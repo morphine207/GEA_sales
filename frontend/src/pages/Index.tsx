@@ -107,7 +107,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <Header onNewProject={handleNewProject} />
+      <Header onNewProject={activeMenuItem === "projects" ? handleNewProject : undefined} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar activeItem={activeMenuItem} onItemClick={handleMenuItemClick} />
         <main className="flex-1 overflow-y-auto">
