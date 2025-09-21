@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Line, LineChart, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, Tooltip as RechartsTooltip } from "recharts";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 import { apiCalculateProjectTCO, apiGetProject, mapBackendProjectToFrontend, TCOCalculationRequest } from "@/lib/api";
 import { Project } from "@/types/project";
 import {
@@ -81,6 +83,7 @@ export default function Compare() {
   const DEFAULT_PROMPT = `You are a GEA Sales Assistant. Write a concise, plain-language summary for all stakeholders.\n\nRequirements:\n- Use short bullets (max 5 words), simple wording\n- Include a tiny comparison table\n- Highlight: best variant, total TCO, savings vs #2, operating cost share\n- Use a few emojis (💰⚡📉)\n- Max 200 words\n\nOutput in Markdown only.`;
   const [prompt, setPrompt] = useState<string>(DEFAULT_PROMPT);
   const [insights, setInsights] = useState<SalesInsights | null>(null);
+  const exportRef = useRef<HTMLDivElement | null>(null);
 
   // Stable color palette for slots #1, #2, #3
   const slotColors = ["#2563eb", "#f59e0b", "#10b981"] as const;
@@ -291,6 +294,71 @@ export default function Compare() {
     await regenerateSummary();
   };
 
+  const handleExportPDF = async () => {
+    try {
+      const node = (document.getElementById("assistant-print") as HTMLDivElement) || exportRef.current;
+      if (!node) return;
+      // Prepare donut chart image for print layout by drawing to offscreen canvas (large size for PDF)
+      if (bestKpis) {
+        const donutData = [
+          { name: "Acquisition", value: bestKpis.totals.ca, color: "#2563eb" },
+          { name: "Commissioning", value: bestKpis.totals.cc, color: "#f59e0b" },
+          { name: "Operating", value: bestKpis.totals.co, color: "#10b981" },
+          { name: "Maintenance", value: bestKpis.totals.cm, color: "#ef4444" },
+        ];
+        const totalVal = donutData.reduce((s, d) => s + (d.value || 0), 0) || 1;
+        // Aim to fill near full A4 content width; generate high-res for crisp output
+        const cw = 600, ch = 400;
+        const cx = cw / 2, cy = ch / 2;
+        const rOuter = Math.min(cx, cy) - 40; // generous margin
+        const rInner = rOuter * 0.68;
+        const cvs = document.createElement("canvas");
+        cvs.width = cw; cvs.height = ch;
+        const ctx = cvs.getContext("2d");
+        if (ctx) {
+          ctx.clearRect(0, 0, cw, ch);
+          let angle = -Math.PI / 2;
+          donutData.forEach(seg => {
+            const segAngle = (seg.value / totalVal) * Math.PI * 2;
+            const start = angle;
+            const end = angle + segAngle;
+            ctx.beginPath();
+            // Outer arc
+            ctx.arc(cx, cy, rOuter, start, end, false);
+            // Inner arc (reverse)
+            ctx.arc(cx, cy, rInner, end, start, true);
+            ctx.closePath();
+            ctx.fillStyle = seg.color;
+            ctx.fill();
+            angle = end;
+          });
+        }
+        const imgEl = document.getElementById("print-donut-img") as HTMLImageElement | null;
+        if (imgEl) {
+          imgEl.src = cvs.toDataURL("image/png");
+        }
+      }
+      // Ensure charts are fully rendered
+      await new Promise(r => setTimeout(r, 250));
+      const canvas = await html2canvas(node, { scale: 2, backgroundColor: "#ffffff" });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const availW = pageWidth - 48; // 24pt margins
+      const availH = pageHeight - 48;
+      const scale = Math.min(availW / canvas.width, availH / canvas.height);
+      const outW = Math.floor(canvas.width * scale);
+      const outH = Math.floor(canvas.height * scale);
+      const x = Math.floor((pageWidth - outW) / 2);
+      const y = Math.floor((pageHeight - outH) / 2);
+      pdf.addImage(imgData, "PNG", x, y, outW, outH, undefined, "FAST");
+      pdf.save(`GEA_Sales_Assistant_${project?.projectName || "summary"}.pdf`);
+    } catch (e) {
+      console.error("PDF export failed", e);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header onNewProject={() => navigate("/project/new")} />
@@ -432,7 +500,7 @@ export default function Compare() {
             <DialogTitle>GEA Sales Assistant</DialogTitle>
             <DialogDescription>AI-Powered Insights for Your TCO Comparison</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 gap-4 max-h-[80vh] overflow-y-auto pr-1">
+          <div className="grid grid-cols-1 gap-4 max-h-[80vh] overflow-y-auto pr-1" ref={exportRef}>
             {bestKpis && (
               <Card className="p-4">
                 <Tabs defaultValue="summary">
@@ -442,11 +510,14 @@ export default function Compare() {
                       <div className="font-semibold">Top Pick</div>
                       <Badge variant="secondary">{bestKpis.name}</Badge>
                     </div>
-                    <TabsList>
-                      <TabsTrigger value="summary">Summary</TabsTrigger>
-                      <TabsTrigger value="table">Table</TabsTrigger>
-                      <TabsTrigger value="donut">Donut</TabsTrigger>
-                    </TabsList>
+                    <div className="flex items-center gap-2">
+                      <TabsList>
+                        <TabsTrigger value="summary">Summary</TabsTrigger>
+                        <TabsTrigger value="table">Table</TabsTrigger>
+                        <TabsTrigger value="donut">Donut</TabsTrigger>
+                      </TabsList>
+                      <Button onClick={handleExportPDF} className="bg-blue-900 hover:bg-blue-800 text-white">Export PDF</Button>
+                    </div>
                   </div>
                   <TabsContent value="summary">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -625,6 +696,155 @@ export default function Compare() {
               )}
               {llmError && <div className="mt-2 text-sm text-red-600">{llmError}</div>}
             </Card>
+
+            {/* Hidden print layout to include ALL assistant data regardless of active tabs */}
+            {bestKpis && (
+              <div id="assistant-print" style={{ position: "absolute", left: -10000, top: 0, width: 794 }}> {/* ~A4 width in px at 96dpi */}
+                <div style={{ padding: 16, fontSize: 14, lineHeight: 1.4 }}>
+                  <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>GEA Sales Assistant</h2>
+                  <div style={{ color: "#6b7280", marginBottom: 8 }}>AI-Powered Insights for Your TCO Comparison</div>
+                  {project && (
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+                      <div>
+                        <div><strong>Project:</strong> {project.projectName}</div>
+                        <div><strong>Application:</strong> {project.application}</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div><strong>Years:</strong> {years}</div>
+                        <div><strong>Throughput/day:</strong> {throughputPerDay} L</div>
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12, marginBottom: 12 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 8 }}>Top Pick: {bestKpis.name}</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+                      <div style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: 8 }}>
+                        <div style={{ fontSize: 12, color: "#6b7280" }}>Total TCO</div>
+                        <div style={{ fontWeight: 700 }}>{currency(bestKpis.totalSum)}</div>
+                      </div>
+                      <div style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: 8 }}>
+                        <div style={{ fontSize: 12, color: "#6b7280" }}>Savings vs #2</div>
+                        <div style={{ fontWeight: 700 }}>{currency(bestKpis.savingsVsNext)}</div>
+                      </div>
+                      <div style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: 8 }}>
+                        <div style={{ fontSize: 12, color: "#6b7280" }}>Operating share</div>
+                        <div style={{ fontWeight: 700 }}>{bestKpis.opSharePct}%</div>
+                      </div>
+                    </div>
+                  </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginBottom: 12 }}>
+                    {/* Components table */}
+                    <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <thead style={{ background: "#f3f4f6" }}>
+                          <tr>
+                            <th style={{ textAlign: "left", fontSize: 12, padding: "6px 8px" }}>Component</th>
+                            <th style={{ textAlign: "right", fontSize: 12, padding: "6px 8px" }}>Amount</th>
+                            <th style={{ textAlign: "right", fontSize: 12, padding: "6px 8px" }}>Share</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {([
+                            ["Acquisition", bestKpis.totals.ca],
+                            ["Commissioning", bestKpis.totals.cc],
+                            ["Operating", bestKpis.totals.co],
+                            ["Maintenance", bestKpis.totals.cm],
+                          ] as const).map(([label, val]) => {
+                            const pct = bestKpis.totalSum ? Math.round((val / bestKpis.totalSum) * 100) : 0;
+                            return (
+                              <tr key={label}>
+                                <td style={{ padding: "6px 8px", fontSize: 12 }}>{label}</td>
+                                <td style={{ padding: "6px 8px", textAlign: "right", fontSize: 12 }}>{currency(val)}</td>
+                                <td style={{ padding: "6px 8px", textAlign: "right", fontSize: 12 }}>{pct}%</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    {/* Donut with legend (image for reliable PDF capture) */}
+                    <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                      <div style={{ fontWeight: 600, marginBottom: 6 }}>Cost Distribution</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
+                        <div style={{ display: "flex", justifyContent: "center" }}>
+                          <img id="print-donut-img" style={{ width: "100%", maxWidth: 400, height: "auto" }} alt="Donut chart" />
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                          {([
+                            { name: "Acquisition", value: bestKpis.totals.ca, color: "#2563eb" },
+                            { name: "Commissioning", value: bestKpis.totals.cc, color: "#f59e0b" },
+                            { name: "Operating", value: bestKpis.totals.co, color: "#10b981" },
+                            { name: "Maintenance", value: bestKpis.totals.cm, color: "#ef4444" },
+                          ]).map(d => {
+                            const pct = bestKpis.totalSum ? Math.round((d.value / bestKpis.totalSum) * 100) : 0;
+                            return (
+                              <div key={d.name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid #e5e7eb", borderRadius: 6, padding: "6px 8px" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  <span style={{ width: 10, height: 10, background: d.color, display: "inline-block", borderRadius: 2 }} />
+                                  <span style={{ fontSize: 12 }}>{d.name}</span>
+                                </div>
+                                <div style={{ textAlign: "right" }}>
+                                  <div style={{ fontSize: 12, fontWeight: 600 }}>{currency(d.value)}</div>
+                                  <div style={{ fontSize: 11, color: "#6b7280" }}>{pct}%</div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Insights JSON block */}
+                  {insights && (
+                    <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12, marginTop: 8 }}>
+                      {(insights.title || insights.subtitle) && (
+                        <div style={{ marginBottom: 8 }}>
+                          {insights.title && <div style={{ fontWeight: 700 }}>{insights.title}</div>}
+                          {insights.subtitle && <div style={{ color: "#6b7280" }}>{insights.subtitle}</div>}
+                        </div>
+                      )}
+                      {Array.isArray(insights.highlights) && insights.highlights.length > 0 && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                          {insights.highlights.map((h, i) => (
+                            <span key={i} style={{ border: "1px solid #e5e7eb", borderRadius: 999, padding: "4px 8px", fontSize: 12 }}>{h}</span>
+                          ))}
+                        </div>
+                      )}
+                      {Array.isArray(insights.comparison) && insights.comparison.length > 0 && (
+                        <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden", marginTop: 8 }}>
+                          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                            <thead style={{ background: "#f3f4f6" }}>
+                              <tr>
+                                <th style={{ textAlign: "left", fontSize: 12, padding: "6px 8px" }}>Machine</th>
+                                <th style={{ textAlign: "right", fontSize: 12, padding: "6px 8px" }}>Total TCO</th>
+                                <th style={{ textAlign: "right", fontSize: 12, padding: "6px 8px" }}>Operating</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {insights.comparison.map((row, idx) => (
+                                <tr key={idx}>
+                                  <td style={{ padding: "6px 8px", fontSize: 12 }}>{row.name}</td>
+                                  <td style={{ padding: "6px 8px", textAlign: "right", fontSize: 12 }}>{currency(row.totalTcoEur)}</td>
+                                  <td style={{ padding: "6px 8px", textAlign: "right", fontSize: 12 }}>{typeof row.operatingCostEur === 'number' ? currency(row.operatingCostEur) : '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                      {Array.isArray(insights.notes) && insights.notes.length > 0 && (
+                        <div style={{ marginTop: 8 }}>
+                          <div style={{ fontWeight: 600, marginBottom: 4 }}>Notes</div>
+                          <ul style={{ margin: 0, paddingLeft: 18 }}>
+                            {insights.notes.map((n, i) => (<li key={i} style={{ fontSize: 12 }}>{n}</li>))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Prompt editor removed as requested */}
           </div>
